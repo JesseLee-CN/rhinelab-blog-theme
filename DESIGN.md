@@ -1,6 +1,9 @@
 # 视觉与行为基准
 
-本文保留三维模块的基准及修订沿革，历史实验应按后续明确修订理解。博客内容、品牌、容量和 PWA 的现行边界以 [AGENTS.md](AGENTS.md) 与[维护手册](BLOG-MAINTAIN-PERFECT.md)为准；历史验证与评估文档未随本模板分发；`verification/` 保留现行复核入口，历史成绩不代表本次复验。
+本文是三维模块的基准与行为参考：记录当前采用的视觉参数，以及已撤回实验的适用顺序。博客内容、
+品牌、容量和 PWA 的现行边界以 [AGENTS.md](AGENTS.md) 与[维护手册](BLOG-MAINTAIN-PERFECT.md)为准；
+历史验证与评估文档的结论、参数与复核方法已总结进本文与 [verification/](verification/README.md)，
+`verification/` 保留现行复核入口，历史成绩不代表本次复验。
 
 ## 2026-09-09 · 屏幕比例与触摸适配
 
