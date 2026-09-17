@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { formatDate, getPublishedPosts } from "../../lib/content";
+
+const posts = await getPublishedPosts();
+const yearFormat = new Intl.DateTimeFormat("en-CA", { year: "numeric", timeZone: "Asia/Shanghai" });
+const monthFormat = new Intl.DateTimeFormat("en-CA", { month: "2-digit", timeZone: "Asia/Shanghai" });
+
+const years = new Map<string, Map<string, typeof posts>>();
+for (const post of posts) {
+  const year = yearFormat.format(post.data.publishedAt);
+  const month = monthFormat.format(post.data.publishedAt);
+  if (!years.has(year)) years.set(year, new Map());
+  const months = years.get(year)!;
+  const bucket = months.get(month) ?? [];
+  bucket.push(post);
+  months.set(month, bucket);
+}
+const sortedYears = [...years.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+---
+
+<BaseLayout title="归档" description="按年月浏览全部公开文章。">
+  <h1 class="page-title">归档</h1>
+  <p class="meta">共 {posts.length} 篇文章</p>
+  {
+    posts.length === 0 ? (
+      <p class="empty-state">还没有公开文章。</p>
+    ) : (
+      sortedYears.map(([year, months]) => (
+        <section class="archive-year">
+          <h2>
+            {year} <span class="meta">{ [...months.values()].reduce((sum, list) => sum + list.length, 0)} 篇</span>
+          </h2>
+          {[...months.entries()]
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .map(([month, items]) => (
+              <div class="archive-month">
+                <h3>{year}-{month}</h3>
+                <ul class="post-list">
+                  {items.map((post) => (
+                    <li>
+                      <a href={post.data.path}>{post.data.title}</a>
+                      <span class="meta"> · {formatDate(post.data.publishedAt)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+        </section>
+      ))
+    )
+  }
+</BaseLayout>

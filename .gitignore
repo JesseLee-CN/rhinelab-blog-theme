@@ -1,0 +1,39 @@
+node_modules/
+backups/
+dist/
+.tools/
+.generated/
+.migration-private/
+.astro/
+apps/blog/.astro/
+ops/deploy.env
+ops/upload.env
+# 凭据/主机配置的本地备份（例如改 SSH_IDENTITY 前留下的 .bak）同样不得入库。
+ops/upload.env.*
+ops/deploy.env.*
+!.env.example
+*.mp4
+*.blend1
+optix7cache.db
+reference/*.jpg
+reference/**/*.jpg
+art/.cache/
+.worktrees/
+release/
+video/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+# boot-identity auth service: real config, data and TLS material stay local.
+ops/auth/*.env
+!ops/auth/*.env.example
+ops/auth/tls/
+services/lab-auth/*.db
+services/lab-auth/*.db-wal
+services/lab-auth/*.db-shm
+*.pem
+*.key
+# Fonts staged into the blog sub-app's publicDir by prepare:assets (generated).
+apps/blog/public/fonts/

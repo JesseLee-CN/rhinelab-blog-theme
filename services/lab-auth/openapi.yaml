@@ -1,0 +1,339 @@
+openapi: 3.1.0
+info:
+  title: Rhine Lab boot identity API
+  version: "1.0.0"
+  description: >-
+    G1 frozen contract for the /lab/ boot identity flow, with the additive
+    register-v1 extension (service 0.4.0+, LOGIN-IMPROVE L1a). Implemented by
+    services/lab-auth (Go). All paths are exact under /lab/api/auth/. All
+    responses are Cache-Control: no-store. Errors never echo passwords or
+    distinguish "unknown user" from "wrong password". Registration is not
+    login: POST /register creates a persistent account and never sets or
+    changes a session cookie.
+x-lab-features: ["register-v1"]
+servers:
+  - url: /lab/api/auth
+paths:
+  /csrf:
+    get:
+      summary: Start a pre-authentication flow
+      operationId: getCsrf
+      responses:
+        "200":
+          description: Flow and its CSRF token. Sets the flow cookie.
+          headers:
+            Set-Cookie:
+              schema:
+                {
+                  type: string,
+                  example: "__Host-lab-flow=...; Secure; HttpOnly; SameSite=Lax; Path=/",
+                }
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CsrfResponse" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /login:
+    post:
+      summary: Verify credentials and open a short-lived pending attempt
+      operationId: login
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Credentials valid; a pending session cookie is set. Session API still reports unauthenticated.
+          headers:
+            Set-Cookie:
+              schema:
+                {
+                  type: string,
+                  example: "__Host-lab-session=...; Secure; HttpOnly; SameSite=Lax; Path=/",
+                }
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /register:
+    post:
+      summary: Create a public account without signing in
+      description: >-
+        Additive register-v1 extension. Requires a pre-auth flow and its CSRF
+        token. Creates one enabled user and returns 201; it never sets a
+        session cookie, never authenticates the caller and never changes an
+        existing session. The client must call /login and /confirm afterwards.
+        Disabled by default; see registration_enabled.
+      operationId: register
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201":
+          description: Account created; no session cookie is set.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RegisterResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/RegistrationUnavailable" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/RegistrationDisabled" }
+  /confirm:
+    post:
+      summary: Promote a pending attempt to an active session
+      operationId: confirm
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfirmRequest" }
+      responses:
+        "200":
+          description: Active session. Never sets a cookie; reuses the pending session cookie.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConfirmResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /session:
+    get:
+      summary: Report the current session state without writing cookies
+      operationId: getSession
+      responses:
+        "200":
+          description: Authenticated or unauthenticated state.
+          headers:
+            Cache-Control:
+              schema: { type: string, const: "no-store" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SessionResponse" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /cancel:
+    post:
+      summary: Cancel a pending attempt or the session it issued
+      operationId: cancel
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CancelRequest" }
+      responses:
+        "204":
+          { description: Cancelled or already cancelled (idempotent). No body. }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /logout:
+    post:
+      summary: Revoke the current session and expire its cookie
+      operationId: logout
+      parameters:
+        - $ref: "#/components/parameters/CsrfToken"
+      responses:
+        "204":
+          {
+            description: Logged out or already anonymous (idempotent). No body.,
+          }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+components:
+  parameters:
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      schema: { type: string }
+  schemas:
+    User:
+      type: object
+      required: [id, username]
+      properties:
+        id: { type: string, description: Stable random user id }
+        username:
+          {
+            type: string,
+            description: Canonical stored username (display case),
+          }
+    Error:
+      type: object
+      required: [error, requestId]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - bad_request
+                - invalid_credentials
+                - origin_rejected
+                - csrf_rejected
+                - state_conflict
+                - payload_too_large
+                - rate_limited
+                - registration_unavailable
+                - registration_disabled
+                - unavailable
+            message: { type: string }
+        requestId: { type: string }
+    CsrfResponse:
+      type: object
+      required: [flowId, attemptId, csrfToken, expiresAt]
+      properties:
+        flowId: { type: string }
+        attemptId: { type: string }
+        csrfToken: { type: string }
+        expiresAt: { type: string, format: date-time }
+    LoginRequest:
+      type: object
+      required: [attemptId, username, password]
+      properties:
+        attemptId: { type: string }
+        username: { type: string, minLength: 3, maxLength: 24 }
+        password:
+          { type: string, description: 15-128 Unicode code points; sent as-is }
+    LoginResponse:
+      type: object
+      required: [pending, user, attemptId]
+      properties:
+        pending: { type: boolean, const: true }
+        user: { $ref: "#/components/schemas/User" }
+        attemptId: { type: string }
+    ConfirmRequest:
+      type: object
+      required: [attemptId]
+      properties:
+        attemptId: { type: string }
+    ConfirmResponse:
+      type: object
+      required: [authenticated, user, sessionExpiresAt, csrfToken]
+      properties:
+        authenticated: { type: boolean, const: true }
+        user: { $ref: "#/components/schemas/User" }
+        sessionExpiresAt: { type: string, format: date-time }
+        csrfToken: { type: string, description: Session-bound token for logout }
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, minLength: 3, maxLength: 24 }
+        password:
+          { type: string, description: 15-128 Unicode code points; sent as-is }
+    RegisterResponse:
+      type: object
+      required: [registered, user]
+      properties:
+        registered: { type: boolean, const: true }
+        user: { $ref: "#/components/schemas/User" }
+    SessionResponse:
+      oneOf:
+        - type: object
+          required: [authenticated]
+          properties:
+            authenticated: { type: boolean, const: false }
+        - type: object
+          required: [authenticated, user, sessionExpiresAt, csrfToken]
+          properties:
+            authenticated: { type: boolean, const: true }
+            user: { $ref: "#/components/schemas/User" }
+            sessionExpiresAt: { type: string, format: date-time }
+            csrfToken: { type: string }
+    CancelRequest:
+      type: object
+      required: [attemptId]
+      properties:
+        attemptId: { type: string }
+  responses:
+    BadRequest:
+      description: Malformed body, unknown field, wrong content type, or body over 4 KiB.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Credentials rejected. Never reveals whether the username exists.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Origin or CSRF check failed.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: Attempt already cancelled/confirmed/expired.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RegistrationUnavailable:
+      description: >-
+        Username cannot be registered (reserved, disabled or already taken).
+        Never reveals which case applies and never returns existing account
+        details.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RegistrationDisabled:
+      description: >-
+        Public registration is disabled or over its quota. Codes:
+        registration_disabled, rate_limited or unavailable. Existing login and
+        guest entry are unaffected.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    PayloadTooLarge:
+      description: Request body exceeds 4 KiB.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    RateLimited:
+      description: Source or username bucket exhausted.
+      headers:
+        Retry-After: { schema: { type: integer } }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unavailable:
+      description: Verification queue full or storage unavailable.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }

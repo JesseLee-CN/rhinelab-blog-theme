@@ -1,0 +1,32 @@
+# Normalize text to LF in the repository so Windows, WSL and the Linux server
+# agree on content. Working trees may still check out native line endings.
+* text=auto
+
+# Binary assets must never be line-ending converted.
+*.woff2 binary
+*.woff binary
+*.ttf binary
+*.otf binary
+*.glb binary
+*.gltf binary
+*.bin binary
+*.blend binary
+*.blend1 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.svg text
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.mp4 binary
+*.pdf binary
+*.zip binary
+*.gz binary
+
+# Generated or vendored text that should keep upstream formatting.
+package-lock.json text eol=lf

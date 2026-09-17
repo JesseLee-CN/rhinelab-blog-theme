@@ -1,0 +1,13 @@
+# 每日认证库快照。安装到 /etc/systemd/system/example-auth-backup.timer。
+# 服务器时区为 CST（+08）；04:40 本地时间 = 20:40 UTC，避开证书续期与 apt 窗口。
+[Unit]
+Description=Daily Rhine Lab auth database snapshot
+
+[Timer]
+OnCalendar=*-*-* 04:40:00
+Persistent=true
+RandomizedDelaySec=600
+Unit=example-auth-backup.service
+
+[Install]
+WantedBy=timers.target

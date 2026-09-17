@@ -1,0 +1,32 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getPublishedPosts } from "../../lib/content";
+
+const posts = await getPublishedPosts();
+const counts = new Map<string, number>();
+for (const post of posts) {
+  for (const category of post.data.categories) {
+    counts.set(category, (counts.get(category) ?? 0) + 1);
+  }
+}
+const categories = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+---
+
+<BaseLayout title="分类" description="按分类浏览公开文章。">
+  <h1 class="page-title">分类</h1>
+  {
+    categories.length === 0 ? (
+      <p class="empty-state">还没有带分类的公开文章。</p>
+    ) : (
+      <ul class="taxonomy">
+        {categories.map(([name, count]) => (
+          <li>
+            <a href={`/categories/${encodeURIComponent(name)}/`}>
+              {name} <span class="meta">({count})</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    )
+  }
+</BaseLayout>

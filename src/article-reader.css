@@ -1,0 +1,579 @@
+/**
+ * Immersive reader surface styles (CONTRACT.md §7, §8, §12 — revised 2026-09-12).
+ *
+ * The reader no longer owns a window or an animation: the dialog is only a
+ * transparent top-layer container, `.modal-backdrop` (shared with ARCHIVE INDEX /
+ * SAVED / SYSTEM) provides the dim + blur, `.terminal-modal` is the window box,
+ * and the enter/exit motion comes from the shared `SurfaceTransition`.
+ *
+ * Sizing: the window is the modal box in *stage* coordinates (1260 × 836) scaled
+ * by the live `--stage-scale`, so the reader covers exactly the same footprint as
+ * the three dialogs; compact/portrait reuse the responsive rules in
+ * `responsive.css`. Typography stays in CSS pixels so the prose remains readable.
+ *
+ * Only reader-scoped selectors live here: no `:root`, `body`, `main` or global
+ * `a` rules, so the 3D application is never affected. The shared prose sheet is
+ * pulled in below (inlined by the bundler).
+ */
+@import "@reading/prose.css";
+@import "./article-reader-markdown.css";
+
+dialog.article-reader {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  width: 100vw;
+  max-width: none;
+  height: 100vh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  overflow: hidden;
+  overscroll-behavior: contain;
+  /* The palette follows the same theme variables the modal surface uses, so the
+     reader stays legible in both themes exactly like the three system dialogs. */
+  --reader-ink: var(--theme-ink, #151713);
+  --reader-paper: var(--theme-panel, rgba(237, 235, 228, 0.97));
+  --reader-line: color-mix(in srgb, var(--theme-ink, #151713) 26%, transparent);
+  --reader-muted: color-mix(in srgb, var(--theme-ink, #151713) 72%, transparent);
+  --reader-accent: var(--theme-accent, #9b7247);
+  /* Code font: JetBrains Maple Mono (JetBrains Mono + Maple Mono), self-hosted
+     woff2 subset; CJK punctuation/ideographs in code fall back to the text face. */
+  --font-mono: "JetBrains Maple Mono", "MiSans", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  /* Rail width: the ticks sit next to the scrollbar (the user's reference), and
+     the expanded panel opens to their left. */
+  --reader-rail: 24px;
+  --reader-width: 1260px;
+  --reader-height: 836px;
+  --reader-font-size: 18px;
+  --reader-padding-x: 32px;
+  --reader-padding-bottom: 24px;
+  /* Shared prose tokens: `shared/reading/prose.css` declares its own defaults on
+     `.prose` (a light-theme palette), and that rule sits on an *inner* element, so
+     a value declared here would be shadowed — the reader used to render quotes and
+     inline code dark-on-dark. Clearing the shared tokens on the prose root lets
+     the reader's theme-aware palette (declared below on `.reader-content .prose`)
+     take over. */
+  --prose-rule: initial;
+  --prose-accent: initial;
+  --prose-muted: initial;
+  --prose-inline-code-bg: initial;
+}
+
+/* The dialog must stay hidden until it is opened: never let a layout rule win. */
+dialog.article-reader:not([open]) {
+  display: none;
+}
+
+dialog.article-reader[open] {
+  display: block;
+}
+
+/* Compact/portrait edges mirror `#stage:is([data-layout=...])` in responsive.css;
+   the dialog lives outside the stage, so it declares them itself (env() must be
+   resolved at the use site, which a copied custom property would not do). */
+:is(dialog.article-reader[data-layout="compact"], dialog.article-reader[data-layout="portrait"]) {
+  --edge: max(20px, env(safe-area-inset-left), env(safe-area-inset-right));
+  --top-edge: max(16px, env(safe-area-inset-top));
+  --bottom-edge: max(12px, env(safe-area-inset-bottom));
+}
+/* The dim layer is the modal backdrop, so the top-layer backdrop stays clear. */
+dialog.article-reader::backdrop {
+  background: transparent;
+}
+
+/* Desktop: the modal window box scaled by the live stage scale. */
+dialog.article-reader[data-layout="desktop"] .reader-sheet {
+  width: calc(1260px * var(--reader-stage-scale, 1));
+  height: calc(836px * var(--reader-stage-scale, 1));
+  max-width: calc(100% - 100px * var(--reader-stage-scale, 1));
+  padding: calc(35px * var(--reader-stage-scale, 1)) calc(53px * var(--reader-stage-scale, 1));
+}
+
+.article-reader .reader-sheet {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* The rail is positioned against the padding box and the reading column scrolls
+     internally, so the window itself must never scroll — including in compact and
+     portrait, where `responsive.css` sets `overflow: auto` on `.terminal-modal`
+     (hence the specificity rather than a plain `overflow: hidden`). */
+  overflow: hidden;
+  color: var(--reader-ink);
+}
+
+:is(dialog.article-reader[data-layout="compact"], dialog.article-reader[data-layout="portrait"]) .reader-sheet {
+  overflow: hidden;
+}
+
+/* The toolbar is the dialogs' top bar (`.reader-toolbar` reuses `modal-top` for
+   typography); the title takes the slack and the actions sit on the far right.
+   `flex-start` rather than the shared `space-between`: with `space-between` the flex
+   algorithm stretches the title box to absorb the free space, which makes the action
+   cluster overflow by ~8px in Firefox/WebKit. With `flex-start` the title grows
+   through its own `flex-grow` instead, and the actions keep their natural width. */
+.article-reader .reader-toolbar {
+  flex: 0 0 auto;
+  min-height: 56px;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 0 12px;
+  border-bottom: 1px solid var(--reader-line);
+  /* Firefox/WebKit report a `scrollWidth` about 8px larger than `clientWidth` on this
+     nowrap flex row even though every child box ends inside the window (measured:
+     title+status+actions+gaps fit, and the `outsideSheet` probe finds nothing out of
+     bounds). Clipping the row keeps that measurement artefact from ever becoming a
+     visible overflow or the sheet's own scrollbar. */
+  overflow: hidden;
+}
+
+.article-reader .reader-title {
+  margin: 0;
+  /* A zero flex basis matters: with `auto` the title contributes its full text width
+     to the free-space calculation, and Firefox/WebKit then let the action cluster
+     overflow the toolbar by ~8px once its gap grew. Growing from 0 makes the title
+     absorb exactly the space the actions and status leave over, and the ellipsis
+     below trims it. */
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.article-reader .reader-status {
+  margin: 0;
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--reader-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.article-reader .reader-status[hidden],
+.article-reader .reader-retry[hidden],
+.article-reader .reader-error[hidden],
+.article-reader .reader-state[hidden] {
+  display: none;
+}
+
+.article-reader .reader-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  /* `min-width: max-content` keeps the whole action cluster at its natural width:
+     Firefox/WebKit compute the flex base size a few pixels narrower than Chromium
+     and then let the children overflow the toolbar by ~8px. */
+  min-width: max-content;
+  /* The independent-article entry and the exit control used to sit 8px apart, which
+     reads as one run-on control; the toolbar labels are 10px, so 24px gives the two
+     actions about two Chinese characters of separation. */
+  gap: 24px;
+}
+
+/* Action controls match the dialogs' "CLOSE ×" in `src/style.css`
+   (.modal-top button): label + small text, no frame, no fill, and a CSS-drawn
+   cross (16×34 box, two 14×2 bars). The exit control keeps the CONTRACT §7 44×44
+   touch target, so it is a 44px box whose contents use the dialog metrics; the
+   independent-article link is plain text. Keep the values below in sync with
+   `.modal-top button` — the `closing-controls` visual case opens ARCHIVE INDEX and
+   compares the two controls computed style for computed style. */
+.article-reader .reader-article-link,
+.article-reader .reader-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 24px;
+  min-height: 44px;
+  border: 0;
+  background: none;
+  color: var(--reader-ink);
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: normal;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.article-reader .reader-close {
+  min-width: 44px;
+  justify-content: center;
+}
+
+.article-reader .reader-close-icon {
+  position: relative;
+  flex: 0 0 16px;
+  height: 34px;
+}
+
+.article-reader .reader-close-icon::before,
+.article-reader .reader-close-icon::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 14px;
+  height: 2px;
+  background: currentColor;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.article-reader .reader-close-icon::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+/* Contextual retry keeps a frame: it is an error-state action, not toolbar chrome. */
+.article-reader .reader-retry {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--reader-line);
+  background: transparent;
+  color: var(--reader-ink);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  padding: 0 12px;
+}
+
+.article-reader .reader-article-link:hover,
+.article-reader .reader-close:hover,
+.article-reader .reader-retry:hover {
+  color: var(--reader-accent);
+}
+
+.article-reader .reader-article-link:focus-visible,
+.article-reader .reader-retry:focus-visible,
+.article-reader .reader-close:focus-visible,
+.article-reader .reader-scroll:focus-visible {
+  outline: 2px solid var(--reader-accent);
+  outline-offset: 2px;
+}
+
+.article-reader .reader-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px 0 var(--reader-padding-bottom);
+  font-size: var(--reader-font-size);
+  line-height: 1.8;
+  scrollbar-gutter: stable;
+  /* Same scrollbar treatment as the system dialogs (`.search-results` in
+     style.css): a thin track-less bar in the theme line colour. */
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--reader-ink) 34%, transparent) transparent;
+  /* Anchored jumps leave a small gap under the toolbar. */
+  scroll-padding-top: 12px;
+}
+
+/* ---------------------------------------------------------------------------
+   Navigation rail: a hover/focus-expanded table of contents pinned to the right
+   edge of the window, over the scroll region. Collapsed it is a ~44px column of
+   ticks, so the reading column (78ch, centred) is never pushed.
+   --------------------------------------------------------------------------- */
+.article-reader .reader-toc {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--reader-rail);
+  z-index: 3;
+}
+
+.article-reader .reader-toc[hidden] {
+  display: none;
+}
+
+.article-reader .reader-toc-panel,
+.article-reader .reader-toc-rail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0;
+}
+
+.article-reader .reader-toc-rail {
+  width: var(--reader-rail);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  row-gap: 5px;
+  pointer-events: none;
+}
+
+/* Each row is exactly one hit lane: full rail width, the 2px bar centred inside,
+   no vertical padding. `gap: 0` therefore means "nothing between two bars expands
+   the panel" — hovering the empty part of the rail or the window edge does not. */
+.article-reader .reader-toc-tick {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--reader-rail);
+  height: 9px;
+  background: none;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.article-reader .reader-toc-tick::before {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 2px;
+  background: color-mix(in srgb, var(--reader-ink) 32%, transparent);
+  transition: width 160ms ease, background-color 160ms ease;
+}
+
+.article-reader .reader-toc-tick[data-level="1"]::before {
+  width: 18px;
+}
+
+.article-reader .reader-toc-tick:hover::before {
+  width: 20px;
+  background: var(--reader-ink);
+}
+
+.article-reader .reader-toc-tick.is-active::before {
+  background: var(--reader-accent);
+}
+
+.article-reader .reader-toc-panel {
+  /* The panel edge must meet the tick bars, not the rail box: the bars are 14px
+     (18px on level 1) centred in the 24px rail, so anchoring the panel at
+     `--reader-rail` left a 5px slit between panel and bars. Anchoring at 2px puts
+     the panel edge ~1px inside the bar edge, so the two read as connected. */
+  right: 2px;
+  width: min(292px, 46vw);
+  max-height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+  padding: 12px 14px;
+  background: color-mix(in srgb, var(--reader-paper) 94%, transparent);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--reader-line);
+  border-right: 0;
+  opacity: 0;
+  /* `visibility: hidden` also removes the links from the tab order while collapsed. */
+  visibility: hidden;
+  transform: translateX(8px);
+  transition: opacity 180ms ease, transform 180ms ease, visibility 180ms;
+}
+
+.article-reader .reader-toc-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.article-reader .reader-toc.is-expanded .reader-toc-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.article-reader .reader-toc-link {
+  display: block;
+  padding: 5px 8px;
+  border: 0;
+  color: var(--reader-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.article-reader .reader-toc-link[data-level="1"] {
+  color: var(--reader-ink);
+  font-weight: 600;
+}
+
+.article-reader .reader-toc-link[data-level="3"],
+.article-reader .reader-toc-link[data-level="4"] {
+  padding-left: 18px;
+  font-size: 11px;
+}
+
+.article-reader .reader-toc-item {
+  display: block;
+}
+
+.article-reader .reader-toc-link:hover,
+.article-reader .reader-toc-link:focus-visible {
+  background: color-mix(in srgb, var(--reader-ink) 10%, transparent);
+  color: var(--reader-ink);
+}
+
+.article-reader .reader-toc-link.is-active {
+  color: var(--reader-accent);
+  box-shadow: inset 2px 0 0 var(--reader-accent);
+}
+
+.article-reader .reader-toc.is-pinned .reader-toc-panel {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+/* Touch and narrow windows have no hover, so a tap on any bar keeps the panel
+   open (`T` and `Esc` cover the keyboard); the rail itself carries no button. */
+@media (hover: none), (max-width: 900px) {
+  .article-reader .reader-toc-rail {
+    row-gap: 3px;
+  }
+}
+
+.article-reader .reader-toc-link:focus-visible {
+  outline: 2px solid var(--reader-accent);
+  outline-offset: 2px;
+}
+
+.article-reader .reader-state {
+  display: block;
+}
+
+.article-reader .reader-error {
+  margin: 12px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--reader-line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--reader-paper) 88%, var(--reader-accent) 12%);
+  color: var(--reader-ink);
+  font-size: 0.92rem;
+}
+
+.article-reader .reader-error-text {
+  margin: 0;
+}
+
+.article-reader .reader-article-link-inline {
+  display: inline-block;
+  margin-top: 12px;
+  text-decoration: underline;
+}
+
+/* Prose rules come from the shared stylesheet; only reader-local tweaks here. */
+.article-reader .reader-content .prose {
+  margin-top: 0;
+  /* The shared palette is cleared on the dialog; these values sit on the prose
+     root itself, so they win over `shared/reading/prose.css`. */
+  --prose-rule: var(--reader-line);
+  --prose-accent: var(--reader-accent);
+  --prose-muted: var(--reader-muted);
+  --prose-inline-code-bg: color-mix(in srgb, var(--reader-ink) 12%, transparent);
+}
+
+/* The shared prose sheet styles typography but deliberately leaves links to the
+   host. Mirror the blog's own link treatment (`apps/blog`): ink at rest, accent on
+   hover/focus — without it the browser's default blue shows through, which was
+   visible in the inline TOC. Scoped to the reader's content region rather than to
+   `.prose`, because the converted block sits inside `.prose` while the error
+   panel's fallback link does not. */
+.article-reader .reader-content a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.article-reader .reader-content a:hover,
+.article-reader .reader-content a:focus-visible {
+  color: var(--reader-accent);
+}
+
+/* Markdown presentation (headings, quotes, code, tables, lists, the inline TOC)
+   lives in `article-reader-markdown.css`, imported above. */
+
+/* Scrolling stays instant by default: the rail animates its own jumps with
+   `behavior: smooth` unless reduced motion is requested, and a CSS-level smooth
+   behaviour would silently animate every programmatic scroll (keyboard paging,
+   the late-layout correction and the tests' own scroll positioning). */
+
+.article-reader .reader-content {
+  min-width: 0;
+  /* The window matches the dialogs' footprint; the reading column stays narrow
+     enough to keep a comfortable measure on a 1260-stage-px window. */
+  max-width: 78ch;
+  margin: 0 auto;
+}
+
+.article-reader .reader-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.article-reader .reader-content pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.article-reader .reader-content table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Narrow screens: the toolbar may wrap so every control stays reachable. */
+@media (max-width: 900px) {
+  .article-reader .reader-toolbar {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+    flex-wrap: wrap;
+    row-gap: 4px;
+    min-height: 0;
+  }
+
+  .article-reader .reader-title {
+    flex: 0 1 auto;
+  }
+
+  .article-reader .reader-actions {
+    margin-left: auto;
+  }
+
+  .article-reader .reader-status {
+    order: 3;
+    flex: 1 1 100%;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
+/* Short landscape viewports keep the toolbar and some prose visible. */
+@media (max-height: 500px) {
+  .article-reader .reader-scroll {
+    padding-top: 10px;
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "note": "开场固定短语的描边图形来源。字体文件（OTF）不进入 Git 与发布包，只发行图形。",
+  "generator": "scripts/make-boot-lettering.py（本站改写版：纯 fontTools，无需 Pillow；支持 --out 与 --mode final）",
+  "command": "python scripts/make-boot-lettering.py --fonts .tools/boot-lettering-src/extract --out src/boot-lettering-art.json --mode final --upstream-art .tools/boot-lettering-src/upstream-art.json",
+  "licence": "Synthview Free Font License（随包 Synthview-eula-free-font.pdf）：允许商业与非商业桌面使用，明确允许把字符作为图形对象描边；禁止任何字体格式转换（含 SVG/TTF/Webfont）与“供终端用户自行排字”的字形产品。",
+  "freeWeights": "作者家族页称 32 个样式中 6 个免费；FontSquirrel「Novecento wide」列出 Light/Book/Normal/Medium/DemiBold/Bold 六个免费样式（含 Bold）。DaFont 包是较窄子集，只含 Light/Normal/DemiBold。",
+  "daFontPackage": {
+    "url": "https://dl.dafont.com/dl/?f=novecento_sans",
+    "sha256": "e3f1f8ea78eb6835ba89cd17695ad4aa2729f12bc1df0fed3df5b48aba426178",
+    "bytes": 1044123,
+    "contains": [
+      "Novecentosanswide-Light.otf",
+      "Novecentosanswide-Normal.otf",
+      "Novecentosanswide-DemiBold.otf",
+      "Synthview-eula-free-font.pdf"
+    ]
+  },
+  "Normal": {
+    "filename": "Novecentosanswide-Normal.otf",
+    "sha256": "8bb9c4a562adeaae69a6174fe3cce83166119841a71b22f3b0d5246680b78e34",
+    "version": "Version 3.001;PS 003.001;hotconv 1.0.70;makeotf.lib2.5.58329",
+    "usedFor": [
+      "access",
+      "request",
+      "processing",
+      "processingGlitch",
+      "permission",
+      "identityOwner",
+      "identityGuest"
+    ]
+  },
+  "DemiBold": {
+    "filename": "Novecentosanswide-DemiBold.otf",
+    "sha256": "853df25212b04737f7c9ea08c2c8f1fa0991fde40bbfb36d3bfdc171d8ad3a53",
+    "version": "Version 3.001;PS 003.001;hotconv 1.0.70;makeotf.lib2.5.58329",
+    "usedFor": ["brand"]
+  },
+  "Bold": {
+    "filename": null,
+    "sha256": null,
+    "provenance": "本站免费 DaFont 包不含 Bold；welcome / company / database 三段的图形原样取自上游提交 51ba3b0 的 src/boot-lettering-art.json（上游 sources.json 记录其 Bold 源文件 sha256 为 dbba358622df5b4bffc76bdb46fb9e688e0f76b8e0f8c386593f4f1a3de159d1，来自其 MyFonts 桌面包）。免费渠道同样提供 Bold（见 freeWeights），如日后本地补齐该 OTF，可用同一生成器重导出并逐个比对。",
+    "usedFor": ["welcome", "company", "database"]
+  },
+  "verification": {
+    "upstreamEquivalence": "用本地 Normal/DemiBold 生成的 access / request / processing / processingGlitch / permission / brand 六段与上游提交的图形逐字节一致（路径与宽度）；宽度等于字体 hmtx 原始 advance（不含 kerning），上游 138 个字母逐个核对零误差。",
+    "localPhrases": {
+      "identityOwner": "ID CONFIRMED : JOYCE MOORE",
+      "identityGuest": "ID CONFIRMED : GUEST"
+    },
+    "artBytes": 32330
+  }
+}

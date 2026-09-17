@@ -1,0 +1,30 @@
+# Boot identity auth service. Installed to /etc/systemd/system/example-auth.service.
+# The system identity is separate from any web login account. nginx connects to
+# the unix socket, so the socket group must be the nginx worker group (adjust
+# RuntimeDirectoryMode/Group after verifying the distro's nginx group).
+[Unit]
+Description=Rhine Lab boot identity auth
+After=network.target
+
+[Service]
+Type=simple
+User=example-auth
+Group=example-auth
+WorkingDirectory=/srv/example-blog-auth
+EnvironmentFile=/etc/example-blog-auth/auth.env
+ExecStart=/srv/example-blog-auth/current/lab-auth serve
+Restart=on-failure
+RestartSec=2s
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/example-blog-auth
+RuntimeDirectory=example-blog-auth
+RuntimeDirectoryMode=0750
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

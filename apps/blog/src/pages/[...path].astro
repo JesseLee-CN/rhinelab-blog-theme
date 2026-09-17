@@ -1,0 +1,35 @@
+---
+import { render } from "astro:content";
+import PostLayout from "../layouts/PostLayout.astro";
+import { getPublishedContent, getPublishedPosts, normalizePath } from "../lib/content";
+
+export async function getStaticPaths() {
+  const entries = await getPublishedContent();
+  return entries.map((entry) => ({
+    params: { path: normalizePath(entry.data.path) },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+const kind = entry.collection === "posts" ? "post" : "page";
+const { Content, headings } = await render(entry);
+
+const body = entry.body ?? "";
+const cjk = (body.match(/[\u4e00-\u9fff]/g) ?? []).length;
+const latin = (body.replace(/[\u4e00-\u9fff]/g, " ").match(/[A-Za-z0-9]+/g) ?? []).length;
+const readingTime = Math.max(1, Math.round(cjk / 400 + latin / 200));
+
+let prev: (typeof entry) | null = null;
+let next: (typeof entry) | null = null;
+if (kind === "post") {
+  const posts = await getPublishedPosts();
+  const index = posts.findIndex((post) => post.data.id === entry.data.id);
+  if (index > 0) prev = posts[index - 1];
+  if (index >= 0 && index < posts.length - 1) next = posts[index + 1];
+}
+---
+
+<PostLayout entry={entry} kind={kind} headings={headings} readingTime={readingTime} prev={prev} next={next}>
+  <Content />
+</PostLayout>

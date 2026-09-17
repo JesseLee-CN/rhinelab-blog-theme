@@ -1,0 +1,152 @@
+{
+  "generatedBy": "scripts/auth/gen-identity-fixtures.mjs",
+  "contract": "src/boot-identity.ts",
+  "username": [
+    {
+      "value": "ab",
+      "ok": false,
+      "error": "too-short"
+    },
+    {
+      "value": "abc",
+      "ok": true,
+      "key": "abc",
+      "label": "ABC"
+    },
+    {
+      "value": "JOYCE_01",
+      "ok": true,
+      "key": "joyce_01",
+      "label": "JOYCE_01"
+    },
+    {
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "key": "aaaaaaaaaaaaaaaaaaaaaaaa",
+      "label": "AAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    {
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": false,
+      "error": "too-long"
+    },
+    {
+      "value": "guest",
+      "ok": false,
+      "error": "reserved"
+    },
+    {
+      "value": "Guest",
+      "ok": false,
+      "error": "reserved"
+    },
+    {
+      "value": "GUEST",
+      "ok": false,
+      "error": "reserved"
+    },
+    {
+      "value": "guest1",
+      "ok": true,
+      "key": "guest1",
+      "label": "GUEST1"
+    },
+    {
+      "value": "a b",
+      "ok": false,
+      "error": "charset"
+    },
+    {
+      "value": "中文名",
+      "ok": false,
+      "error": "charset"
+    },
+    {
+      "value": "a@b",
+      "ok": false,
+      "error": "charset"
+    },
+    {
+      "value": "a/b",
+      "ok": false,
+      "error": "charset"
+    },
+    {
+      "value": ".",
+      "ok": false,
+      "error": "too-short"
+    },
+    {
+      "value": "-",
+      "ok": false,
+      "error": "too-short"
+    },
+    {
+      "value": "..",
+      "ok": false,
+      "error": "too-short"
+    },
+    {
+      "value": "a.b-c_d",
+      "ok": true,
+      "key": "a.b-c_d",
+      "label": "A.B-C_D"
+    },
+    {
+      "value": "Joyce Lee",
+      "ok": false,
+      "error": "charset"
+    }
+  ],
+  "password": [
+    {
+      "value": "aaaaaaaaaaaaaa",
+      "ok": false,
+      "error": "too-short",
+      "codePoints": 14
+    },
+    {
+      "value": "aaaaaaaaaaaaaaa",
+      "ok": true,
+      "codePoints": 15
+    },
+    {
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": true,
+      "codePoints": 128
+    },
+    {
+      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "ok": false,
+      "error": "too-long",
+      "codePoints": 129
+    },
+    {
+      "value": "   aaaaaaaaaaaa   ",
+      "ok": true,
+      "codePoints": 18
+    },
+    {
+      "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "ok": false,
+      "error": "too-short",
+      "codePoints": 14
+    },
+    {
+      "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
+      "ok": true,
+      "codePoints": 15
+    },
+    {
+      "value": "correct horse battery staple",
+      "ok": true,
+      "codePoints": 28
+    },
+    {
+      "value": " pass word éé ",
+      "ok": false,
+      "error": "too-short",
+      "codePoints": 14
+    }
+  ]
+}

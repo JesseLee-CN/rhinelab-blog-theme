@@ -1,0 +1,13 @@
+# 每 15 分钟健康检查。安装到 /etc/systemd/system/example-health.timer。
+# Persistent=true：服务器重启后补跑一次，避免监测空窗。
+[Unit]
+Description=Periodic Rhine Lab site health check
+
+[Timer]
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=60
+Unit=example-health.service
+
+[Install]
+WantedBy=timers.target

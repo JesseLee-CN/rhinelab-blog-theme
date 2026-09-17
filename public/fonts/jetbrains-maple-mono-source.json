@@ -1,0 +1,23 @@
+{
+  "generatedAt": "2026-09-12T21:44:30.324Z",
+  "source": "https://github.com/SpaceTimee/Fusion-JetBrainsMapleMono/releases/download/1.2304.79/JetBrainsMapleMono-XX-XX-XX-XX.zip",
+  "version": "1.2304.79",
+  "family": "JetBrains Maple Mono",
+  "license": "OFL-1.1",
+  "unicodes": "U+0020-007E,U+00A0-00FF,U+2000-206F,U+2190-21FF,U+2500-257F,U+25A0-25FF,U+3000-303F,U+FF00-FFEF",
+  "files": [
+    {
+      "weight": "Regular",
+      "path": "/fonts/jetbrains-maple-mono/regular.woff2",
+      "bytes": 239012,
+      "sha256": "9daed8d45adc487d52ca0a085e74bf83b20b80ed2ce52118b19a9f03c04942b2"
+    },
+    {
+      "weight": "Bold",
+      "path": "/fonts/jetbrains-maple-mono/bold.woff2",
+      "bytes": 246468,
+      "sha256": "850abb8ed6e52b302372f6b4a1a2a8d3f556d536f1ec191176a90a0b500f239f"
+    }
+  ],
+  "totalBytes": 485480
+}

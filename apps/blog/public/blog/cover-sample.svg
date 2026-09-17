@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" role="img" aria-label="示例封面">
+  <rect width="1200" height="630" fill="#e8e5e1" />
+  <g fill="none" stroke="#080a08" stroke-width="4">
+    <circle cx="940" cy="300" r="220" />
+    <circle cx="940" cy="300" r="180" />
+    <path d="M60 470h520M60 500h360" />
+  </g>
+  <text x="60" y="180" font-family="monospace" font-size="64" fill="#080a08">RHINE LAB</text>
+  <text x="60" y="250" font-family="monospace" font-size="28" fill="#080a08">ANALYSIS OS / BLOG</text>
+</svg>

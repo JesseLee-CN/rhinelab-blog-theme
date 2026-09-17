@@ -1,0 +1,17 @@
+# 认证库快照。安装到 /etc/systemd/system/example-auth-backup.service，
+# 由 example-auth-backup.timer 每日触发（见 BLOG-MAINTAIN-PERFECT.md §10.3/§16.5）。
+# 以 root 运行：库文件为 0600 example-auth，快照目录 root-only。
+[Unit]
+Description=Rhine Lab auth database snapshot
+After=network.target example-auth.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/example-blog-auth/ops/backup.sh --db /var/lib/example-blog-auth/auth.db --out-dir /var/backups/example-blog-auth --keep 7 --bin /srv/example-blog-auth/releases/current/lab-auth
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/example-blog-auth

@@ -1,0 +1,25 @@
+MiSans — text and UI typeface
+Copyright © 2020-2025 Beijing Xiaomi Mobile Software Co.,Ltd. All Rights Reserved.
+Official source: https://hyperos.mi.com/font/download (https://hyperos.mi.com/font-download/MiSans.zip)
+Sharded webfont build: misans-webfont@4.3.1 (cn-font-split output), font files copied
+byte-for-byte from that package; only family naming, weight mapping and URLs are
+adapted for this site. Package: https://github.com/mobeicanyue/misans-webfont
+Licence: MiSans-license.pdf (shipped alongside the fonts)
+This build ships four weights (300/400/600/700) as woff2 shards under /fonts/misans/.
+
+JetBrains Maple Mono — code typeface
+Fuses JetBrains Mono (Latin) with Maple Mono (CJK); by Space Time.
+Source: https://github.com/SpaceTimee/Fusion-JetBrainsMapleMono (release 1.2304.79)
+Upstream: https://github.com/JetBrains/JetBrainsMono, https://github.com/subframe7536/maple-font
+Licence: SIL Open Font License 1.1 — JetBrains-Maple-Mono-OFL.txt
+Subset (Latin, punctuation, arrows, box drawing, CJK punctuation + the code points
+this site's Markdown uses) as woff2: jetbrains-maple-mono-source.json
+
+Both families are embedded in this site for web delivery only and are not sold or
+redistributed on a stand-alone basis. MiSans is used under Xiaomi's MiSans font
+licence (free commercial use and web embedding); JetBrains Maple Mono is used under
+the SIL Open Font License 1.1, which requires the licence text and copyright notice
+to travel with the fonts.
+
+Fonts are generated, not hand-edited: run `node .tools/font-sans/build-fonts.mjs`
+to rebuild both trees from their official sources (see the source JSON files in this directory).

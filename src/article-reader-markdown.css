@@ -1,0 +1,408 @@
+/**
+ * Markdown presentation for the immersive reader window (2026-09-12 追加).
+ *
+ * The *structure* is ported from [anuppuccin](https://github.com/AnubisNekhet/anuppuccin)
+ * (MIT, Obsidian + Catppuccin): one consistent set of marks — hairline rules under
+ * h1–h3, a two-tone quote (accent bar + washed fill), hairline-ruled tables with a
+ * tinted header row and row stripes, square list markers, a plain hairline `hr`,
+ * neutral inline code with a wash, accent-highlighted selections and square
+ * corners everywhere. Its colours (`--ctp-*`) are deliberately **not** ported:
+ * every colour below is the reader's own theme palette (`--reader-*`, which mirrors
+ * `--theme-*`, the site's palette), extended only by mixing those tokens with
+ * `color-mix()`. There is no yellow/blue/red "semantic" palette here, so highlight
+ * and code neutrals use ink/accent washes instead of Catppuccin's named accents.
+ *
+ * Scope: this module only ever styles `.article-reader .reader-content …`, i.e.
+ * the reader's converted prose. The blog pages keep the shared
+ * `shared/reading/prose.css` presentation, and the reader's own chrome (toolbar,
+ * navigation rail, error panel) is untouched.
+ */
+
+/* ---------------------------------------------------------------------------
+   1. Squared corners
+   ---------------------------------------------------------------------------
+   The reference theme uses `border-radius: 0` for content blocks, and the site's
+   reader is square-cornered too, so nothing inside the reading region may round.
+   The rule is an explicit guard: the converted prose currently declares no radius
+   at all, and this keeps it that way if a future element (or a host stylesheet)
+   introduces one. It deliberately stops at `.reader-content`, so the window
+   chrome keeps the same corners as the three system dialogs. */
+.article-reader .reader-content,
+.article-reader .reader-content *,
+.article-reader .reader-content *::before,
+.article-reader .reader-content *::after {
+  border-radius: 0;
+}
+
+/* The lab root sets `font-synthesis: none` (src/style.css) and MiSans ships no
+   italic, so `<em>`/`<i>`/`<cite>` render upright here while the very same markup
+   slants on the blog page (which never sets the property). Restore the initial
+   value inside the reading region only, so emphasis matches the article page. */
+.article-reader .reader-content {
+  font-synthesis: weight style small-caps;
+}
+
+/* anuppuccin highlights selections with a washed accent; the site has a single
+   accent token, so the wash is that accent and the text keeps the body ink. */
+.article-reader .reader-content ::selection {
+  background: color-mix(in srgb, var(--reader-accent) 30%, transparent);
+  color: var(--reader-ink);
+}
+
+/* ---------------------------------------------------------------------------
+   2. Heading rhythm and hairline dividers (anuppuccin: h1–h3 divider)
+   ------------------------------------------------------------------------- */
+.article-reader .reader-content .prose :is(h1, h2, h3, h4, h5, h6) {
+  color: var(--reader-ink);
+  line-height: 1.32;
+  margin: 2rem 0 0.7rem;
+}
+
+.article-reader .reader-content .prose h1 {
+  font-size: 1.6em;
+}
+
+.article-reader .reader-content .prose :is(h1, h2, h3) {
+  /* anuppuccin draws the divider in the window's border colour, 2px below the
+     text; a hairline reads better at 18px body size than at Obsidian's scale. */
+  border-bottom: 1px solid var(--reader-line);
+  padding-bottom: 0.22em;
+}
+
+.article-reader .reader-content .prose h1 {
+  margin-top: 0;
+}
+
+/* The converted document opens with the article title, which the toolbar already
+   shows; keep the rule as the only separator. */
+.article-reader .reader-content .prose > h1:first-child {
+  margin-top: 0.2rem;
+}
+
+/* ---------------------------------------------------------------------------
+   3. Text rhythm and inline marks (anuppuccin: neutral bold/italic, washed code)
+   ------------------------------------------------------------------------- */
+.article-reader .reader-content .prose p,
+.article-reader .reader-content .prose ul,
+.article-reader .reader-content .prose ol,
+.article-reader .reader-content .prose dl {
+  margin: 0 0 1.05rem;
+}
+
+.article-reader .reader-content .prose :is(ul, ol) {
+  padding-left: 1.4rem;
+}
+
+.article-reader .reader-content .prose li {
+  margin: 0.25rem 0;
+}
+
+.article-reader .reader-content .prose li > :is(ul, ol) {
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+/* anuppuccin's list-toggle: square markers, alternating filled/hollow outline per
+   nesting level. `::marker` cannot mix a colour per level in every engine, so the
+   colour stays one token and only the shape alternates. */
+.article-reader .reader-content .prose ul > li {
+  list-style-type: square;
+}
+
+.article-reader .reader-content .prose ul ul > li {
+  list-style-type: circle;
+}
+
+.article-reader .reader-content .prose ul > li::marker {
+  color: var(--reader-muted);
+}
+
+.article-reader .reader-content .prose ul ul > li::marker {
+  color: var(--reader-accent);
+}
+
+.article-reader .reader-content .prose li::marker {
+  color: var(--reader-muted);
+}
+
+.article-reader .reader-content .prose strong,
+.article-reader .reader-content .prose b {
+  color: var(--reader-ink);
+  font-weight: 600;
+}
+
+.article-reader .reader-content .prose em,
+.article-reader .reader-content .prose i,
+.article-reader .reader-content .prose cite {
+  color: var(--reader-ink);
+}
+
+.article-reader .reader-content .prose del,
+.article-reader .reader-content .prose s {
+  color: var(--reader-muted);
+}
+
+/* anuppuccin highlights with a 20% wash of a named accent; the site has one
+   accent, so the wash is that accent and the text keeps the body ink. */
+.article-reader .reader-content .prose mark {
+  background: color-mix(in srgb, var(--reader-accent) 26%, transparent);
+  color: var(--reader-ink);
+  padding: 0 0.15em;
+}
+
+.article-reader .reader-content .prose kbd {
+  border: 1px solid var(--reader-line);
+  background: color-mix(in srgb, var(--reader-ink) 8%, transparent);
+  padding: 0.05em 0.35em;
+  font-size: 0.86em;
+}
+
+.article-reader .reader-content .prose abbr[title] {
+  text-decoration: underline dotted;
+  text-underline-offset: 0.18em;
+}
+
+/* Task-list boxes: the allow-list keeps the disabled `input[type=checkbox]` from
+   the article, and the user agent paints it in the platform accent (blue). A drawn
+   square keeps it in the site's palette and square with everything else. */
+.article-reader .reader-content .prose input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 0.95em;
+  height: 0.95em;
+  margin: 0 0.45em 0 0;
+  vertical-align: -0.08em;
+  border: 1px solid var(--reader-muted);
+  background: transparent;
+  accent-color: var(--reader-accent);
+}
+
+.article-reader .reader-content .prose input[type="checkbox"]:checked {
+  border-color: var(--reader-accent);
+  background: var(--reader-accent);
+}
+
+/* ---------------------------------------------------------------------------
+   4. Two-tone blockquote (anuppuccin: accent bar + washed background)
+   ------------------------------------------------------------------------- */
+.article-reader .reader-content .prose blockquote {
+  margin: 0 0 1.15rem;
+  padding: 0.55rem 0.9rem;
+  border-left: 3px solid var(--reader-accent);
+  background: color-mix(in srgb, var(--reader-accent) 9%, transparent);
+  color: var(--reader-muted);
+}
+
+.article-reader .reader-content .prose blockquote > :last-child {
+  margin-bottom: 0;
+}
+
+.article-reader .reader-content .prose blockquote blockquote {
+  margin-top: 0.6rem;
+  border-left-color: var(--reader-line);
+  background: color-mix(in srgb, var(--reader-ink) 6%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   5. Code: neutral inline chip, square fenced block with a hairline frame
+   ---------------------------------------------------------------------------
+   Astro renders code through Shiki, which writes `background-color`/`color` as
+   *inline styles* (`class="astro-code github-dark"`). Inline styles outrank a
+   stylesheet, so the block palette needs `!important` to become the site's own:
+   plain blocks in the article keep the body ink on the plain hairline frame.
+   Token colours are neutralised to the same ink (no imported rainbow palette). */
+.article-reader .reader-content .prose :not(pre) > code {
+  background: color-mix(in srgb, var(--reader-ink) 9%, transparent);
+  color: var(--reader-ink);
+  padding: 0.12em 0.34em;
+  font-size: 0.9em;
+}
+
+.article-reader .reader-content .prose pre {
+  margin: 0 0 1.15rem;
+  padding: 0.95rem 1.05rem;
+  background: color-mix(in srgb, var(--reader-ink) 7%, transparent) !important;
+  border: 1px solid var(--reader-line);
+  color: var(--reader-ink) !important;
+  font-size: 0.88rem;
+  line-height: 1.62;
+}
+
+.article-reader .reader-content .prose pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+
+.article-reader .reader-content .prose pre :is(span, code) {
+  color: var(--reader-ink) !important;
+}
+
+/* ---------------------------------------------------------------------------
+   6. Tables: hairline rules, tinted header row, row stripes
+   ------------------------------------------------------------------------- */
+.article-reader .reader-content .prose table {
+  margin: 0 0 1.2rem;
+  border: 1px solid var(--reader-line);
+  border-collapse: collapse;
+  font-size: 0.94em;
+}
+
+.article-reader .reader-content .prose :is(th, td) {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--reader-line);
+  text-align: left;
+}
+
+.article-reader .reader-content .prose th {
+  background: color-mix(in srgb, var(--reader-ink) 8%, transparent);
+  color: var(--reader-ink);
+  font-weight: 600;
+}
+
+.article-reader .reader-content .prose tbody tr:nth-child(2n) td {
+  background: color-mix(in srgb, var(--reader-ink) 4%, transparent);
+}
+
+.article-reader .reader-content .prose caption {
+  caption-side: bottom;
+  padding-top: 0.45rem;
+  color: var(--reader-muted);
+  font-size: 0.86em;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------------------------
+   7. Rules, folds and the inline table of contents (all square, all themed)
+   ------------------------------------------------------------------------- */
+.article-reader .reader-content .prose hr {
+  height: 1px;
+  margin: 1.7rem 0;
+  border: 0;
+  background: var(--reader-line);
+}
+
+.article-reader .reader-content .prose details {
+  margin: 0 0 1.1rem;
+  border: 1px solid var(--reader-line);
+  padding: 0.6rem 0.8rem;
+}
+
+.article-reader .reader-content .prose summary {
+  cursor: pointer;
+  color: var(--reader-ink);
+}
+
+.article-reader .reader-content .prose details[open] > summary {
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--reader-line);
+}
+
+.article-reader .reader-content .prose img,
+.article-reader .reader-content .prose figure {
+  margin: 0 0 1.15rem;
+  max-width: 100%;
+}
+
+/* Images get the same hairline frame as the code blocks and tables. */
+.article-reader .reader-content .prose img {
+  display: block;
+  border: 1px solid var(--reader-line);
+}
+
+.article-reader .reader-content .prose figcaption {
+  margin-top: 0.4rem;
+  color: var(--reader-muted);
+  font-size: 0.86em;
+  text-align: left;
+}
+
+/* Footnote block (Astro emits `section[data-footnotes]` + back-references). */
+.article-reader .reader-content .prose [data-footnotes] {
+  margin-top: 1.6rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--reader-line);
+  color: var(--reader-muted);
+  font-size: 0.88em;
+}
+
+/* ---------------------------------------------------------------------------
+   8. Content head (meta line, taxonomy) and the inline TOC as a square block
+   ---------------------------------------------------------------------------
+   Astro emits the article head — `h1.page-title`, `div.meta`, `ul.taxonomy` and
+   `nav.toc` — as **siblings of `.prose`** inside the reader's `.reader-prose`
+   wrapper, so these rules are scoped to `.reader-content` rather than to
+   `.prose` (CONTRACT.md: 内联 `nav.toc` 在阅读层按 `--reader-line` /
+   `--reader-muted` 重新配色). The blog page's metrics are mirrored; every
+   colour stays a reader token or a `color-mix()` of one, and the meta line keeps
+   the host font (it only becomes smaller and muted). */
+.article-reader .reader-content .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  margin: 0 0 0.75rem;
+  color: var(--reader-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.article-reader .reader-content .taxonomy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1.4rem;
+  padding: 0;
+  list-style: none;
+}
+
+.article-reader .reader-content .taxonomy a {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--reader-line);
+  color: var(--reader-ink);
+  font-size: 0.8rem;
+  text-decoration: none;
+}
+
+.article-reader .reader-content .taxonomy a:hover,
+.article-reader .reader-content .taxonomy a:focus-visible {
+  color: var(--reader-accent);
+  border-color: var(--reader-accent);
+}
+
+.article-reader .reader-content .toc {
+  margin: 0 0 1.4rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--reader-line);
+  background: color-mix(in srgb, var(--reader-ink) 5%, transparent);
+  font-size: 0.92rem;
+}
+
+.article-reader .reader-content .toc-title {
+  display: block;
+  margin: 0 0 0.5rem;
+  color: var(--reader-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* 目录只保留缩进区分层级：不带数字编号，也不带任何行首符号（用户 2026-09-13 要求）。 */
+.article-reader .reader-content .toc ol {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+
+.article-reader .reader-content .toc li {
+  margin: 0.2rem 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+
+.article-reader .reader-content .toc .toc-sub {
+  margin-left: 1.25rem;
+  list-style: none;
+}

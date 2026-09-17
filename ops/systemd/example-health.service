@@ -1,0 +1,17 @@
+# 例行健康检查。安装到 /etc/systemd/system/example-health.service，
+# 由 example-health.timer 每 15 分钟触发（见 BLOG-MAINTAIN-PERFECT.md §10.3）。
+# 需要读证书私钥目录之外的 cert.pem、用 systemctl 查询服务状态、写状态文件与日志。
+[Unit]
+Description=Rhine Lab site health check
+After=network.target nginx.service
+
+[Service]
+Type=oneshot
+ExecStart=/srv/example-blog/ops/healthcheck.sh
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/example-blog/state /var/log

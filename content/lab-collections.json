@@ -1,0 +1,29 @@
+{
+  "themes": [
+    {
+      "name": "学习",
+      "description": "课程、软件与实验记录",
+      "postIds": ["wp-55"]
+    },
+    {
+      "name": "日常",
+      "description": "随笔与生活记录",
+      "postIds": ["wp-19", "wp-38", "wp-71"]
+    },
+    {
+      "name": "技术",
+      "description": "开发、工具与迁移记录",
+      "postIds": []
+    },
+    {
+      "name": "阅读",
+      "description": "书影音与摘录",
+      "postIds": []
+    },
+    {
+      "name": "归档",
+      "description": "早期文章与旧站内容",
+      "postIds": []
+    }
+  ]
+}

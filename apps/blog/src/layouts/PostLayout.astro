@@ -1,0 +1,141 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import { formatDate, entryUrl, type AnyEntry } from "../lib/content";
+
+interface Props {
+  entry: AnyEntry;
+  kind: "post" | "page";
+  headings?: { depth: number; slug: string; text: string }[];
+  readingTime?: number;
+  prev?: AnyEntry | null;
+  next?: AnyEntry | null;
+}
+
+const { entry, kind, headings = [], readingTime = 0, prev = null, next = null } = Astro.props;
+const { data } = entry;
+const canonical = data.path;
+const description = data.description || data.title;
+const canonicalUrl = new URL(entryUrl(canonical), Astro.site ?? Astro.url).href;
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3);
+
+const jsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": kind === "post" ? "BlogPosting" : "WebPage",
+  headline: data.title,
+  description,
+  datePublished: data.publishedAt.toISOString(),
+  dateModified: (data.updatedAt ?? data.publishedAt).toISOString(),
+  author: { "@type": "Person", name: data.author },
+  mainEntityOfPage: canonicalUrl,
+  ...(readingTime ? { wordCount: readingTime } : {}),
+  ...(data.cover ? { image: new URL(data.cover, Astro.site ?? Astro.url).href } : {}),
+}).replaceAll("<", "\\u003c");
+---
+
+<BaseLayout
+  title={data.title}
+  description={description}
+  canonical={canonical}
+  ogType={kind === "post" ? "article" : "website"}
+  ogImage={data.cover}
+  publishedTime={kind === "post" ? data.publishedAt.toISOString() : undefined}
+  modifiedTime={kind === "post" ? (data.updatedAt ?? data.publishedAt).toISOString() : undefined}
+  author={data.author}
+>
+  <article
+  data-pagefind-body
+  {...kind === "post"
+    ? {
+        "data-reader-version": "1",
+        "data-reader-kind": "post",
+        "data-post-id": data.id,
+        "data-canonical-path": canonical,
+      }
+    : {}}
+>
+  <div data-reader-content={kind === "post" ? true : undefined}>
+    <h1 class="page-title">{data.title}</h1>
+    <div class="meta">
+      <time datetime={data.publishedAt.toISOString()}>发布于 {formatDate(data.publishedAt)}</time>
+      {data.updatedAt && <span>更新于 {formatDate(data.updatedAt)}</span>}
+      <span>{data.author}</span>
+      {kind === "post" && readingTime > 0 && <span>约 {readingTime} 分钟</span>}
+    </div>
+    {
+      (data.categories.length > 0 || data.tags.length > 0) && (
+        <ul class="taxonomy">
+          {data.categories.map((category) => (
+            <li>
+              <a href={`/categories/${encodeURIComponent(category)}/`}>{category}</a>
+            </li>
+          ))}
+          {data.tags.map((tag) => (
+            <li>
+              <a href={`/tags/${encodeURIComponent(tag)}/`}>#{tag}</a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    {data.cover && <img class="cover" src={data.cover} alt={`${data.title} 封面`} width="1200" height="630" loading="lazy" />}
+    {
+      toc.length > 1 && (
+        <nav class="toc" aria-label="目录">
+          <p class="toc-title">目录</p>
+          <ol>
+            {toc.map((heading) => (
+              <li class={heading.depth === 3 ? "toc-sub" : undefined}>
+                <a href={`#${heading.slug}`}>{heading.text}</a>
+              </li>
+            ))}
+          </ol>
+        </nav>
+      )
+    }
+    <div class="prose">
+      <slot />
+    </div>
+  </div>
+  <div class="post-actions">
+    <button type="button" class="copy-link" data-url={canonicalUrl}>复制链接</button>
+    <a href={canonicalUrl}>规范地址</a>
+  </div>
+</article>
+
+  {
+    (prev || next) && (
+      <nav class="post-nav" aria-label="前后篇">
+        {prev && (
+          <a class="post-nav-item" rel="prev" href={prev.data.path}>
+            <span>上一篇</span>
+            <strong>{prev.data.title}</strong>
+          </a>
+        )}
+        {next && (
+          <a class="post-nav-item post-nav-next" rel="next" href={next.data.path}>
+            <span>下一篇</span>
+            <strong>{next.data.title}</strong>
+          </a>
+        )}
+      </nav>
+    )
+  }
+
+  <script type="application/ld+json" set:html={jsonLd} />
+  <script is:inline>
+    document.addEventListener("click", function (event) {
+      var button = event.target.closest(".copy-link");
+      if (!button) return;
+      var url = button.getAttribute("data-url");
+      var done = function () {
+        button.textContent = "已复制";
+        setTimeout(function () { button.textContent = "复制链接"; }, 1500);
+      };
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(done, done);
+      } else {
+        done();
+      }
+    });
+  </script>
+</BaseLayout>

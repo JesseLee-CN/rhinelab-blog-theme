@@ -1,0 +1,187 @@
+/* LOGIN-IMPROVE L1b: the boot intro curtain. A sibling of the scaled #stage in
+   viewport CSS pixels. It owns the CONNECTING composition and the single
+   recycled Logo node until the handoff; #stage stays visually hidden. */
+
+.boot-intro {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: #e8e5e1;
+  color: #151713;
+  font-family: "MiSans", system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+
+.boot-intro[hidden] {
+  display: none;
+}
+
+.intro-background {
+  position: absolute;
+  inset: 0;
+  /* Matches .boot-background so the handoff has no background seam. */
+  background: radial-gradient(
+    ellipse at 51% 48%,
+    #e7e7e1 0%,
+    #e3e1dc 76%,
+    #e4dfdb 100%
+  );
+}
+
+.intro-logo-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.intro-logo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 256px;
+  transform-origin: top left;
+  will-change: transform;
+}
+
+.intro-logo svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: #080a08;
+}
+
+.intro-connecting {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, 84px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.intro-connecting[hidden] {
+  display: none;
+}
+
+.intro-panel-clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  visibility: hidden;
+}
+
+.intro-panel {
+  position: absolute;
+  will-change: transform;
+}
+
+.intro-connecting > span {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #888277;
+}
+
+.intro-connecting > i {
+  width: 180px;
+  height: 1px;
+  background: #bab3a5;
+  position: relative;
+  margin-top: 20px;
+  overflow: hidden;
+}
+
+.intro-connecting > i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 60px;
+  background: #414639;
+  animation: intro-loading 1.3s ease-in-out infinite;
+}
+
+@keyframes intro-loading {
+  0% {
+    transform: translateX(-60px);
+  }
+  100% {
+    transform: translateX(180px);
+  }
+}
+
+/* Reuse the shared .brand / .powered typography; only the viewport anchor
+   differs from the scaled #stage positions. */
+.brand.intro-brand {
+  left: 32px;
+  top: 28px;
+  width: auto;
+  pointer-events: none;
+}
+
+.powered.intro-powered {
+  right: 34px;
+  bottom: 30px;
+  pointer-events: none;
+}
+
+.boot-intro[data-intro-phase="connecting"] .intro-brand,
+.boot-intro[data-intro-phase="connecting"] .intro-powered,
+.boot-intro[data-intro-phase="resource-error"] .intro-brand,
+.boot-intro[data-intro-phase="resource-error"] .intro-powered {
+  opacity: 0;
+}
+
+.intro-resource-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 0 24px;
+  box-sizing: border-box;
+}
+
+.intro-resource-error[hidden] {
+  display: none;
+}
+
+.intro-resource-error strong {
+  font-size: 29px;
+}
+
+.intro-resource-error p {
+  margin: 0;
+  font-size: 18px;
+  line-height: 2;
+  color: #7c7568;
+}
+
+.intro-resource-error button {
+  font-size: 16px;
+  border-bottom: 1px solid;
+  padding-bottom: 8px;
+}
+
+@media (max-width: 700px) {
+  .brand.intro-brand {
+    left: 20px;
+    top: 20px;
+    transform: scale(0.72);
+    transform-origin: top left;
+  }
+  .powered.intro-powered {
+    right: 20px;
+    bottom: 24px;
+    transform: scale(0.85);
+    transform-origin: bottom right;
+  }
+}

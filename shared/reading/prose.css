@@ -1,0 +1,84 @@
+/*
+ * Shared Markdown typography for the blog pages and the immersive reader.
+ * Every selector stays scoped to .prose; host surfaces provide the variables
+ * (--rule, --accent, --muted, --font-mono) or override the --prose-* ones.
+ */
+
+.prose {
+  --prose-rule: var(--rule, rgba(8, 10, 8, 0.16));
+  --prose-accent: var(--accent, #ed821b);
+  --prose-muted: var(--muted, rgba(8, 10, 8, 0.62));
+  --prose-font-mono: var(
+    --font-mono,
+    "JetBrains Maple Mono",
+    ui-monospace,
+    "SFMono-Regular",
+    "Cascadia Code",
+    Menlo,
+    Consolas,
+    monospace
+  );
+  --prose-code-bg: #0d100d;
+  --prose-code-ink: #e8e5e1;
+  --prose-inline-code-bg: rgba(8, 10, 8, 0.08);
+  overflow-wrap: anywhere;
+}
+
+.prose h2,
+.prose h3 {
+  line-height: 1.3;
+  margin: 2.25rem 0 0.75rem;
+}
+
+.prose h2 {
+  padding-bottom: 0.35rem;
+  border-bottom: 1px solid var(--prose-rule);
+}
+
+.prose p,
+.prose ul,
+.prose ol {
+  margin: 0 0 1.1rem;
+}
+
+.prose pre {
+  padding: 1rem;
+  overflow-x: auto;
+  background: var(--prose-code-bg);
+  color: var(--prose-code-ink);
+  font-family: var(--prose-font-mono);
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.prose code {
+  font-family: var(--prose-font-mono);
+  font-size: 0.9em;
+}
+
+.prose :not(pre) > code {
+  padding: 0.1em 0.35em;
+  background: var(--prose-inline-code-bg);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  margin: 0 0 1.25rem;
+}
+
+.prose th,
+.prose td {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--prose-rule);
+  text-align: left;
+}
+
+.prose blockquote {
+  margin: 0 0 1.25rem;
+  padding: 0.25rem 0 0.25rem 1rem;
+  border-left: 3px solid var(--prose-accent);
+  color: var(--prose-muted);
+}

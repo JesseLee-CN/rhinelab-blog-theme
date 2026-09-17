@@ -1,0 +1,14 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { getPublishedContent } from "../lib/content";
+
+const entries = await getPublishedContent();
+const known = new Set(entries.map((entry) => entry.data.path.replace(/^\/+|\/+$/g, "")));
+---
+
+<BaseLayout title="页面不存在" description="请求的页面不存在。" noindex>
+  <h1 class="page-title">404 · 页面不存在</h1>
+  <p>你访问的地址没有对应内容，可能是链接过期或输入有误。</p>
+  <p>可以回到 <a href="/">首页</a>，或使用 <a href="/search/">站内搜索</a>。</p>
+  <p class="meta">已知路径数量：{known.size}</p>
+</BaseLayout>

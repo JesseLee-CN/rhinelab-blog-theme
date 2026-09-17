@@ -1,0 +1,27 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { formatDate, getPublishedPosts } from "../../lib/content";
+
+export async function getStaticPaths() {
+  const posts = await getPublishedPosts();
+  const names = [...new Set(posts.flatMap((post) => post.data.categories))];
+  return names.map((name) => ({ params: { category: name }, props: { name } }));
+}
+
+const { name } = Astro.props;
+const posts = (await getPublishedPosts()).filter((post) => post.data.categories.includes(name));
+---
+
+<BaseLayout title={`分类：${name}`} description={`分类「${name}」下的公开文章。`}>
+  <h1 class="page-title">分类：{name}</h1>
+  <ul class="post-list">
+    {posts.map((post) => (
+      <li>
+        <h2><a href={post.data.path}>{post.data.title}</a></h2>
+        <p>{post.data.description}</p>
+        <div class="meta"><time datetime={post.data.publishedAt.toISOString()}>{formatDate(post.data.publishedAt)}</time></div>
+      </li>
+    ))}
+  </ul>
+  <p><a href="/categories/">← 全部分类</a></p>
+</BaseLayout>

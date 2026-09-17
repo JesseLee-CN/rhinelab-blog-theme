@@ -1,0 +1,176 @@
+/* LOGIN-IMPROVE L1c: the 图三 login/register panel. It lives inside the
+   intro's right-hand panel clip, so all sizes are real CSS pixels. The panel
+   entrance/exit transforms are driven by BootIntro (frame sampling); this file
+   only defines the stable layout. */
+
+.boot-entry {
+  width: 100%;
+  color: #151713;
+  font-family:
+    "MiSans",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+}
+
+.entry-form {
+  display: grid;
+  margin: 0;
+}
+
+.entry-welcome {
+  margin: 0 0 30px;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.entry-field {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.entry-field[hidden] {
+  display: none;
+}
+
+.entry-label {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #151713;
+}
+
+.entry-field input {
+  width: 100%;
+  min-height: 26px;
+  padding: 2px 0 4px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: #151713;
+  font: inherit;
+  font-size: 16px;
+  box-sizing: border-box;
+}
+
+.entry-field input:focus {
+  outline: none;
+  border-bottom-color: #151713;
+}
+
+.entry-field input:focus-visible {
+  outline: 2px solid #151713;
+  outline-offset: 2px;
+}
+
+.entry-error {
+  min-height: 1.3em;
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #9c2b16;
+}
+
+.entry-error[data-tone="success"] {
+  color: #3f602c;
+}
+
+.entry-submit {
+  width: 100%;
+  min-height: 53px;
+  border: 0;
+  background: #151713;
+  color: #e8e5e1;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  cursor: pointer;
+}
+
+.entry-submit:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.entry-submit:focus-visible {
+  outline: 2px solid #151713;
+  outline-offset: 2px;
+}
+
+.entry-continue {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 10px;
+  border: 1px solid #151713;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.entry-continue strong {
+  font-weight: 600;
+}
+
+.entry-continue[hidden] {
+  display: none;
+}
+
+.entry-continue:focus-visible {
+  outline: 2px solid #151713;
+  outline-offset: 2px;
+}
+
+.entry-links {
+  display: flex;
+  justify-content: center;
+  gap: 150px;
+  margin-top: 20px;
+}
+
+.entry-link {
+  min-height: 44px;
+  padding: 12px 4px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+}
+
+.entry-link:hover {
+  color: #000;
+}
+
+.entry-link[hidden] {
+  display: none;
+}
+
+.entry-link:focus-visible {
+  outline: 2px solid #151713;
+  outline-offset: 2px;
+}
+
+.boot-entry [data-intro-row] {
+  will-change: transform, opacity;
+}
+
+@media (max-width: 700px) {
+  .entry-welcome {
+    font-size: 22px;
+    margin-bottom: 22px;
+  }
+  .entry-links {
+    gap: 80px;
+  }
+}

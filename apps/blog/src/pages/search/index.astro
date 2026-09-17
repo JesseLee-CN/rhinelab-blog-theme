@@ -1,0 +1,19 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="搜索" description="站内全文检索，只索引公开文章正文。" noindex>
+  <h1 class="page-title">站内搜索</h1>
+  <p class="meta">索引只包含公开文章的正文；草稿、未来文章和三维演示内容不会出现。</p>
+  <link href="/pagefind/pagefind-ui.css" rel="stylesheet" />
+  <div id="search"></div>
+  <noscript><p class="empty-state">搜索需要 JavaScript。你仍然可以通过<a href="/archive/">归档</a>和<a href="/categories/">分类</a>浏览文章。</p></noscript>
+  <script is:inline src="/pagefind/pagefind-ui.js"></script>
+  <script is:inline>
+    window.addEventListener("DOMContentLoaded", function () {
+      if (window.PagefindUI) {
+        new window.PagefindUI({ element: "#search", showSubResults: true, translations: { placeholder: "搜索文章…", zero_matches: "没有匹配结果" } });
+      }
+    });
+  </script>
+</BaseLayout>

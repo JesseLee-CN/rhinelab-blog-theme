@@ -1,0 +1,43 @@
+Opening lettering / 开场文字
+
+Novecento Sans Wide, designed by Jan Tonellato / Synthview Type Design.
+https://typography.synthview.com/novecento-sans-font-family.php
+
+The fixed English phrases in the opening and the fixed RHINE LAB corner heading
+are drawn as outlined graphics (letters imported as graphical objects). The
+source repository ships those graphics and never the font files.
+Original font copyrights and ownership remain with Jan Tonellato / Synthview.
+The project's MIT license does not relicense the underlying typeface.
+
+Sources used for the shipped graphics
+- Normal and DemiBold: the author's free DaFont package (free desktop license),
+  https://www.dafont.com/novecento-sans.font
+  https://typography.synthview.com/pdf/eula-free-font-dafont.pdf
+  Package SHA-256 and per-weight font hashes are recorded in
+  verification/boot-lettering/sources.json.
+- Bold (WELCOME TO / RHINE LAB.LLC. / INTERNAL DATABASE): the graphics are
+  carried over unchanged from the upstream project's artwork. The author's
+  free set also includes Bold (FontSquirrel lists six free Novecento wide
+  styles: Light, Book, Normal, Medium, DemiBold, Bold), so a local checkout may
+  regenerate these phrases once the free package is placed under
+  .tools/boot-lettering-src/ and scripts/make-boot-lettering.py is rerun.
+- Identity line (ID CONFIRMED : ...): locally generated normal-weight graphics
+  for the fixed labels this site displays; other account names fall back to
+  ordinary text until their artwork exists.
+
+Both source licenses permit characters to be imported as graphical objects
+(letters outlined as graphics). The desktop font files must not be redistributed
+or embedded in this project, and the free license does not allow converting the
+fonts into any font format (including webfont formats). Changing the authored
+phrases requires separately obtaining the fonts and rerunning
+scripts/make-boot-lettering.py locally.
+
+Optional official webfont kit (not used by this site)
+MyFonts / Monotype Font Software For Web Content EULA (v260616).
+https://www.myfonts.com/pages/license-agreement?id=eula_2267&eula_lang=eula_en
+The fonts are individually licensed to the website owner. Other users must
+obtain their own license; this project's MIT license does not cover them.
+Retain the original kit's RhineLabNovecento.css copyright and license notice.
+Webfont rights are limited by the owner's license term, domain and pageviews.
+This site ships no Novecento webfont files, so the opening always renders the
+authored graphics.
