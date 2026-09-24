@@ -37,3 +37,6 @@ services/lab-auth/*.db-shm
 *.key
 # Fonts staged into the blog sub-app's publicDir by prepare:assets (generated).
 apps/blog/public/fonts/
+# 本地交互测试：认证服务配置/数据库/自签证书，以及便携式 Go 工具链，都不入库。
+.local-auth/
+.local-tools/
