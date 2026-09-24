@@ -113,30 +113,31 @@ git remote -v
 - 控制关系：`main.ts` 持有偏好并按 `motionActive(key)` 分发；`ArchiveScene.setMotion()` 接收
   阵列相关键（指针视差、拖拽动量等）；`ModelViewer.setMotion()` 接收查看器相关键；
   样式侧由 `#stage` 的 `reduce-motion` / `reduce-surfaces` 类驱动。
-- 本仓库的 `scene.ts` 是裁剪版：阵列侧的逐键偏好目前归并为一次整体判断（`reduced` getter），
-  与上游的差异与原因见 §7.2。
+- 本仓库的 `scene.ts` 是裁剪版：逐键语义与上游一致，但代码结构因移除的模块而不同（见 §7.2）。
 
-## 7.2 动效接线的落地情况与剩余差异
+## 7.2 动效接线的落地情况
 
-**已落地**：
+上游的细粒度动效**已完整接线**：
 
-- `src/motion-preferences.ts` 逐字节取自上游；`src/main.ts` 已接线——初始化读取 `storedPrefs.motion`
-  并把旧的 `reduced` 设置迁移为逐键偏好，32 处动效判定改为 `motionActive(key)`
-  （`boot` / `rollingText` / `rollingNumbers` / `surfaceTransitions` / `documentReveal` /
-  `viewerNavigation`），设置面板换成上游的预设按钮 + 14 键精细设置，事件处理与上游一致
-  （逐键开关保留展开状态与滚动位置、预设按钮重绘面板）。
-- `ArchiveScene.setMotion()` 与 `ModelViewer.setMotion()` 接收偏好；样式侧由 `#stage` 的
-  `reduce-motion` / `reduce-surfaces` 类驱动。
+- `src/motion-preferences.ts` 逐字节取自上游。
+- `src/main.ts`：初始化读取 `storedPrefs.motion` 并把旧的 `reduced` 设置迁移为逐键偏好；
+  32 处动效判定改为 `motionActive(key)`（`boot` / `rollingText` / `rollingNumbers` /
+  `surfaceTransitions` / `documentReveal` / `viewerNavigation`）；设置面板换成上游的
+  预设按钮 + 14 键精细设置；事件处理与上游一致（逐键开关保留展开状态与滚动位置、预设按钮重绘面板）。
+- `src/scene.ts`：阵列侧逐键接入——`selectionTransition`（轨道移动、悬停抬起、选中波浪抬升）、
+  `detailTransition`（归位旋转与提升、清晰度收束）、`idleWave`（静止起伏）、`selectionWave`
+  （涟漪与脉冲发射）、`pointerParallax`（指针视差）、`dragMomentum`（松手滑行动量）、
+  `modelDecryption`（模型解密）；`setMotion()` 与 `setReduced()`（开发对照页兼容入口）保留。
+- `src/model-viewer.ts`：`setMotion()` 接收查看器键（`viewerNavigation` / `viewerModelTransition`）。
+- 样式侧由 `#stage` 的 `reduce-motion` / `reduce-surfaces` 类驱动。
 
-**与上游的已知差异**（刻意保留，非缺陷）：
+**仍与上游不同的地方**（刻意保留）：
 
-- `scene.ts` 是裁剪版：阵列侧的逐键细分（`selectionTransition` / `detailTransition` / `idleWave` /
-  `selectionWave` / `modelDecryption` / `pointerParallax`）目前**归并为一次整体判断**
-  （`reduced` getter：任一键关闭即视为降低动效）。因此关闭其中任一键，阵列侧的行为等同于
-  全部关闭——界面上的逐键开关对「界面/详情/开场」等部分精确生效，对阵列内部动画是整体生效。
-  细分需要逐个调用点按语义映射，留作后续步骤；`setReduced()` 保留给开发对照页。
 - 上游 `main.ts` / `scene.ts` 依赖本模板已移除的模块（wallpaper、workbench、startup、
-  rolling-clock 等 12 个），因此**不能直接取用上游版本**，只能按裁剪版逐处适配。
+  rolling-clock 等 12 个），因此这两个文件**不能直接取用上游版本**，只能按裁剪版逐处适配；
+  本仓库的实现按功能对齐上游语义，但代码结构不完全相同。
+- 本模板没有 wallpaper / workbench / PWA 等实验功能，因此与它们相关的动效键在界面上仍可用并保存，
+  但不会作用于这些不存在的功能。
 
 ## 8. 同步锚点与记录
 
