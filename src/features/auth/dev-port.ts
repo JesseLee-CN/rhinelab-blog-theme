@@ -1,8 +1,8 @@
 // DEV-only fake identity port for browser UI checks (G4/L1c). Never imported by
 // the production bundle: main.ts loads it behind `import.meta.env.DEV`. The
 // register mock only exercises the UI; it is not evidence of real registration.
-import { validatePassword, validateUsername } from "./identity";
-import { AuthError, type IdentityPort, type PublicUser } from "./client";
+import { validatePassword, validateUsername } from "../../../shared/auth/identity";
+import { AuthError, type IdentityPort, type PublicUser } from "../../../shared/auth/client";
 
 type Mode =
   | "success"

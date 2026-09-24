@@ -41,7 +41,22 @@ async function findFile(urlPath) {
   }
 }
 
+/** The account API is an optional component and this preview has no backend. */
+const SESSION_PATHS = ["/api/auth/session", "/lab/api/auth/session"];
+
 createServer(async (request, response) => {
+  const urlPath = (request.url ?? "/").split("?")[0];
+  // 账号岛在每个页面查询一次登录态。静态预览没有账号服务，这里只回答
+  // 「未登录」，让页头渲染真实的未登录状态，而不是在控制台留下一个 404。
+  // 其余 /api/auth/* 一律真实 404——预览不假装登录可用。
+  if (SESSION_PATHS.includes(urlPath)) {
+    response.writeHead(200, {
+      "Content-Type": MIME[".json"],
+      "Cache-Control": "no-store",
+    });
+    response.end('{"authenticated":false}');
+    return;
+  }
   const file = await findFile(request.url ?? "/");
   if (!file) {
     const notFound = join(dist, "404.html");
@@ -61,4 +76,5 @@ createServer(async (request, response) => {
   createReadStream(file).pipe(response);
 }).listen(port, "127.0.0.1", () => {
   console.log(`预览 http://127.0.0.1:${port}/ （静态 dist/，未知路径返回真实 404）`);
+  console.log("账号接口未接入本预览：登录态固定为未登录，登录表单会提示服务不可用。");
 });

@@ -7,7 +7,7 @@ import { loadTs } from "./load-ts.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../..");
-const id = loadTs(resolve(repoRoot, "src/features/auth/identity.ts"));
+const id = loadTs(resolve(repoRoot, "shared/auth/identity.ts"));
 
 const usernames = [
   "ab", "abc", "JOYCE_01", "a".repeat(24), "a".repeat(25),
@@ -23,7 +23,7 @@ const passwords = [
 
 const fixture = {
   generatedBy: "scripts/auth/gen-identity-fixtures.mjs",
-  contract: "src/features/auth/identity.ts",
+  contract: "shared/auth/identity.ts",
   username: usernames.map((value) => {
     const result = id.validateUsername(value);
     return result.ok

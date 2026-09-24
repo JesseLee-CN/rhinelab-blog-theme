@@ -321,6 +321,144 @@ main {
   }
 }
 
+/* Account: the header control and the /account/ page. The session lives in one
+   origin-wide cookie, so these styles describe state only; they never decide it. */
+.account-link[data-account-state="signed-in"] {
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: 0.04em;
+}
+
+.account-lede {
+  color: var(--muted);
+  margin-top: 0;
+}
+
+.account {
+  border: 1px solid var(--rule);
+  padding: 1.5rem;
+  margin: 2rem 0;
+  background: var(--paper-raised);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.account-session p {
+  margin: 0 0 0.75rem;
+}
+
+.account-signed-in strong {
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+}
+
+.account-hint {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.account-tabs button {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.account-tabs button[aria-selected="true"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.account-field {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.account-field span {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.account-field input {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+
+.account-field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.account-rules {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.account-status {
+  min-height: 1.5rem;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+.account-status[data-kind="error"] {
+  color: #a3320b;
+}
+
+.account-status[data-kind="ok"] {
+  color: #1d6b3a;
+}
+
+.account-button {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.55rem 1.1rem;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.account-button:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.account-session .account-button {
+  background: transparent;
+  color: inherit;
+  border-color: var(--rule);
+}
+
 @media print {
   .site-header,
   .site-footer,

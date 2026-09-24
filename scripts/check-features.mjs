@@ -102,7 +102,7 @@ for (const feature of features) {
   for (const check of feature.checks ?? []) {
     if (!scripts[check]) problems.push(`[${id}] package.json 缺少声明的检查命令：npm run ${check}`);
   }
-  for (const dir of [feature.serverSide, feature.ops, feature.scripts, feature.shared, feature.docs].flat()) {
+  for (const dir of [feature.serverSide, feature.ops, feature.scripts, feature.shared, feature.surfaces, feature.docs].flat()) {
     if (!exists(dir)) problems.push(`[${id}] 清单声明的路径不存在：${dir}`);
   }
   if (feature.eager !== true && feature.eager !== false) problems.push(`[${id}] 缺少 eager 布尔字段`);

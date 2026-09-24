@@ -55,7 +55,7 @@ npm run preview         # 静态 dist/ 预览，未知路径返回真实 404
 | [docs/AUTHORING.md](docs/AUTHORING.md) | 写作与内容维护：frontmatter、草稿与未来文章、URL 与重定向、三维主题映射 |
 | [docs/BUILD.md](docs/BUILD.md) | 构建与发布：构建顺序、本地预览、资源白名单、release 打包与激活、回滚、排障 |
 | [docs/READER.md](docs/READER.md) | 沉浸式阅读：窗口与布局参数、控件与目录导航、内容白名单、滚动恢复 |
-| [docs/IDENTITY.md](docs/IDENTITY.md) | 启动身份与认证：身份规则、接口与错误、Cookie/CSRF、超时与限流 |
+| [docs/IDENTITY.md](docs/IDENTITY.md) | 账号体系：身份规则、接口与错误、Cookie/CSRF、账号库管理（CLI 与管理 API）、与博客共享登录态 |
 | [docs/UPSTREAM.md](docs/UPSTREAM.md) | 上游来源与署名、第三方资源许可、处理上游更新的原则 |
 | [docs/fonts/README.md](docs/fonts/README.md) | 字体来源、许可与重建方式 |
 | [docs/README.md](docs/README.md) | 文档索引 |

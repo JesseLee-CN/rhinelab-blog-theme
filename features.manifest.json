@@ -3,7 +3,7 @@
   "features": [
     {
       "id": "auth",
-      "title": "启动身份门与登录/注册",
+      "title": "账号体系：启动身份门、登录/注册与共享会话",
       "dir": "src/features/auth",
       "entry": "src/features/auth/index.ts",
       "publicApi": ["createEntryFeature", "HANDOFF_APP_TIME"],
@@ -13,13 +13,14 @@
       "reason": "序幕必须在初次绘制前遮挡舞台（LOGIN-IMPROVE L1b），因此随入口静态引入。",
       "styles": ["panel.css", "intro.css"],
       "styleEntry": "src/features/auth/index.ts",
-      "checks": ["test:identity", "test:intro", "test:entry", "check:entry", "check:intro", "check:flow"],
+      "checks": ["test:identity", "test:intro", "test:entry", "check:entry", "check:intro", "check:flow", "check:account"],
       "reviewContract": ["introPhase", "panelPhase", "panelBusy", "identity"],
       "runtimeMarkers": ["boot-entry", "boot-intro", "auth-client"],
       "serverSide": ["services/lab-auth"],
       "ops": ["ops/auth", "ops/nginx/auth-location.conf", "ops/systemd/example-auth.service"],
       "scripts": ["scripts/auth"],
-      "shared": [],
+      "shared": ["shared/auth"],
+      "surfaces": ["apps/blog/src/pages/account.astro", "apps/blog/src/scripts/account.ts"],
       "docs": ["docs/IDENTITY.md"]
     },
     {
@@ -41,6 +42,7 @@
       "ops": [],
       "scripts": ["scripts/reading"],
       "shared": ["shared/reading"],
+      "surfaces": [],
       "docs": ["docs/READER.md"]
     }
   ]

@@ -1,9 +1,10 @@
 import { escapeHtml } from "../../html";
 import { BootEntry } from "./panel";
-import { createAuthClient, type IdentityPort } from "./client";
+import { createAuthClient, type IdentityPort } from "../../../shared/auth/client";
 import { HANDOFF_APP_TIME } from "./intro-motion";
 import { BootIntro } from "./intro";
-import type { BootIdentity, ChosenIdentity, EntryPanelPhase, IntroPhase } from "./identity";
+import type { BootIdentity, ChosenIdentity } from "../../../shared/auth/identity";
+import type { EntryPanelPhase, IntroPhase } from "./identity";
 
 /**
  * 启动身份门与登录/注册的状态机（G4/L1a、LOGIN-IMPROVE L0–L4c）。

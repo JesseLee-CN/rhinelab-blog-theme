@@ -17,7 +17,8 @@ import {
   logoStateAt,
   type IntroLayout,
 } from "./intro-motion";
-import type { ChosenIdentity, IntroPhase } from "./identity";
+import type { ChosenIdentity } from "../../../shared/auth/identity";
+import type { IntroPhase } from "./identity";
 
 // Size of the legacy loading mark (style.css `.loading-mark`).
 const CONNECTING = { width: 150, height: 90 } as const;

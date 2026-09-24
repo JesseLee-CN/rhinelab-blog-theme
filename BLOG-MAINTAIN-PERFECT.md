@@ -175,6 +175,7 @@ npm run test:reader-e2e -- --browser chromium
 ```bash
 npm ci --ignore-scripts
 npm run check:content        # 内容 schema、路径、草稿、封面、主题引用
+npm run check:features       # 功能模块边界（入口唯一、无跨功能穿透、无孤儿文件）
 npm run test:blog            # 内容契约单元测试
 npm run check:viewport       # 视口/布局检查
 npm run typecheck            # 三维 TypeScript 检查
@@ -185,6 +186,7 @@ npm run check:boot-baseline  # 开场基线检查
 npm run test:identity        # 身份与用户名规则
 npm run test:entry           # 身份时间线
 npm run test:login-e2e       # 登录/注册端到端
+npm run check:account        # 账号端到端：CLI 建号 → 博客登录 → /lab/ 同一会话（需 Go）
 npm run bench:auth           # 认证服务容量压测
 npm run check:site           # 构建后产物、泄露与 lab 边界检查
 npm run build                # 完整构建
@@ -192,6 +194,32 @@ npm run preview              # 静态预览
 npm run release -- --id <id> # 打包不可变 release
 node ops/smoke-test.mjs <url>
 ```
+
+### 6.1 账号管理命令（`lab-auth` CLI）
+
+账号库的日常操作优先走 CLI（也可用 `/api/auth/admin/*` 管理 API，字段与语义一致）。
+flag 写在位置参数之前，`-json` 输出与 API 字段一致：
+
+```bash
+lab-auth user list    -db <path>                    # 账号列表（-search/-enabled/-limit/-offset）
+lab-auth user show    -db <path> -json <用户名>
+lab-auth user create  -db <path> <用户名>            # 密码从终端隐藏输入两次
+lab-auth user disable -db <path> <用户名>            # 停用并撤销该账号会话
+lab-auth user enable  -db <path> <用户名>
+lab-auth user reset-password -db <path> <用户名>     # 重置并撤销会话
+lab-auth user delete  -db <path> [-force] <用户名>   # 删账号；最后一个可用账号需 -force
+lab-auth session list -db <path> [-user <ref>] [-state active]
+lab-auth session revoke -db <path> <用户名|user-id>
+lab-auth audit list   -db <path> [-action user.disable] [-limit 50]
+lab-auth db status    -db <path>                    # schema 版本、账号/会话/审计计数
+lab-auth db verify    -db <path>                    # 额外跑 PRAGMA integrity_check
+lab-auth db backup    -db <path> -out <file>
+lab-auth db restore   -src <file> -db <path>
+```
+
+- 每次变更都会写一条审计（actor `cli:<系统用户>`）；删除账号**不会**删除它的审计记录。
+- 已发布的迁移文件不可修改（`schema_migrations` 校验 SHA-256），只能追加 `000N_*.sql`。
+- 管理 API 需要 `LAB_AUTH_ADMIN_TOKEN`（≥32 字符），未设置时该接口返回 503 而非裸奔。
 
 ---
 

@@ -24,17 +24,18 @@
 
 清单的唯一事实来源是仓库根的 [`features.manifest.json`](../features.manifest.json)。
 
-### 2.1 启动身份门与登录/注册（`auth`）
+### 2.1 账号体系：启动身份门、登录/注册与共享会话（`auth`）
 
 - **职责**：启动序幕（2D 开场幕布）、身份选择页、登录与公开注册面板、会话恢复与一键继续、
-  切换身份、退出登录。
+  切换身份、退出登录；以及**账号数据库的管理**（Go CLI 与管理 API）与**博客侧登录**
+  （`/account/` 页与页头账号控件），两端共享同一个源级会话 Cookie。
 - **目录**：`src/features/auth/`
   - `index.ts` 唯一入口（同时静态引入本功能的两份样式表）
   - `entry.ts` 身份门状态机 + `EntryHost`/`EntryFeature` 契约
   - `intro.ts` / `intro.css` 序幕幕布；`intro-motion.ts` 纯轨迹计算（可单测）
   - `panel.ts` / `panel.css` 登录/注册面板
-  - `identity.ts` 纯规则（用户名、密码、身份比较、阶段迁移表）
-  - `client.ts` 同源认证端口；`dev-port.ts` DEV 专用假端口（不进生产包）
+  - `identity.ts` lab 侧阶段表（序幕/面板/认证状态机）；账号规则已移到 `shared/auth/`
+  - `dev-port.ts` DEV 专用假端口（不进生产包）
 - **加载方式**：首屏静态引入。序幕必须在任何 `await` 之前完成首帧遮挡（LOGIN-IMPROVE L1b）。
 - **宿主端口** `EntryHost`：`prepareBootFrame`、`commitBootHandoff`、`setGateInert`、
   `setStageHidden`、`engageAudio`、`closeOverlays`、`returnToBoot`、`notify`。
@@ -42,10 +43,20 @@
   `label`、`requestedScene`、`setPhase`、`hide`、`adopt`、`start`、`resourcesFailed`、
   `tick`、`resize`、`setStageRect`、`summaryMarkup`、`canLogout`、`switchIdentity`、
   `logout`、`usePlaybackIdentity`、`hideForPlayback`、`snapshot`、`dispose`。
-- **相关目录**：`services/lab-auth`（Go/SQLite 认证服务）、`ops/auth`、`ops/nginx/auth-location.conf`、
-  `ops/systemd/example-auth.*`、`scripts/auth`。
-- **检查**：`test:identity`、`test:intro`、`test:entry`、`check:entry`、`check:intro`、`check:flow`。
-- **行为说明**：[IDENTITY.md](IDENTITY.md)。
+- **共享层** `shared/auth/`：`identity.ts`（用户名/密码规则与身份模型，纯函数）、
+  `client.ts`（`/api/auth` 协议客户端与错误码）、`session.ts`（会话桥：缓存、登录/退出、
+  `BroadcastChannel` 跨标签同步）。博客页与三维入口都用它，不各自实现协议。
+- **其他界面**：`apps/blog/src/pages/account.astro`（登录/注册/退出页）与
+  `apps/blog/src/scripts/account.ts`（页头控件 + 账号页共用的岛，渐进增强）。
+- **服务端**：`services/lab-auth`（Go/SQLite）：账号接口 + `/admin/*` 管理 API、
+  `internal/store/accounts.go` 的 `UserDirectory`/`AuditLog`/`SessionDirectory` 接口、
+  `migrations/0002_audit.sql` 审计表。
+- **相关目录**：`ops/auth`、`ops/nginx/auth-location.conf`、`ops/systemd/example-auth.*`、
+  `scripts/auth`。
+- **检查**：`test:identity`、`test:intro`、`test:entry`、`check:entry`、`check:intro`、
+  `check:flow`、`check:account`（端到端：CLI 建号 → 博客登录 → `/lab/` 认领同一会话 → 退出失效），
+  以及服务端 `go test ./...`。
+- **行为说明**：[IDENTITY.md](IDENTITY.md)（§8 账号管理、§9 与博客共享登录态）。
 
 ### 2.2 沉浸式 Markdown 阅读（`reader`）
 
@@ -180,3 +191,25 @@ npm run build              # 统一构建（含 check:features）
 
 对照实验证明这些失败与模块化无关：把改造临时 `git stash` 回 HEAD 后重新构建，阅读层
 端到端得到**完全相同的 5 个失败用例与 327/335 检查**，`check:entry` 得到**相同的 48/50**。
+
+### 6.3 账号体系标准化与博客登录的验证记录（2026-09-24）
+
+同一天的第二批改动：账号数据库管理标准化/接口化（`store` 仓储接口 + 审计表 + `/admin/*`
+管理 API + CLI 分组语法与 `-json`），以及博客静态页登录与两端共享会话（`shared/auth/`、
+`/account/` 页、页头账号控件）。
+
+| 检查 | 结果 |
+| --- | --- |
+| `go vet ./...` + `go test ./...`（services/lab-auth） | 全部通过：config / identity / password / ratelimit / server / store / cmd 七个包；新增 `store` 账号管理与审计测试、`server` 管理 API 测试（令牌、禁用分支、CRUD、审计、最后账号保护、旧前缀）、`cmd` CLI 测试（`-json`、审计、最后账号保护、未知子命令） |
+| `typecheck` | 通过 |
+| `check:features` | 通过（auth 功能新增 `shared/auth` 与两个博客界面路径声明） |
+| `build:blog` + `build:lab` + `search:index` + `check:site` | 通过（博客新增 `/account/` 页面，站点检查仍无泄露） |
+| `check:artifacts` | 1581 个产物 0 发现（账号岛 bundle 8.3 KB，无 `/lab/`、`article-reader`、`.glb`、`three` 等禁用引用） |
+| `check:account` | **16/16 通过**：CLI 建号 → 管理 API 列出 → 博客登录 → `/lab/` 启动身份门认领同一身份 → 旧前缀同样报告已登录 → 退出后两边同时失效、Cookie 清除 |
+| `test:reader-e2e` | 19/19 用例、337/337 检查通过 |
+| `test:identity` / `test:entry` / `test:intro` / `check:entry` | 通过（账号规则迁到 `shared/auth/identity.ts` 后脚本分别加载共享规则与 lab 阶段表） |
+
+回归修复记录：加入账号岛后，`test:reader-e2e` 一度 15 个场景失败（每个场景的控制台错误检查
+都命中 `/api/auth/session` 的 404）。原因是静态预览服务器没有账号后端，而账号岛会在每个页面
+查询一次登录态。修法是让 `scripts/blog/preview.mjs` 对 session 端点回答「未登录」、其余
+`/api/auth/*` 保持真实 404——预览不再产生假 404，也没有假装登录可用。

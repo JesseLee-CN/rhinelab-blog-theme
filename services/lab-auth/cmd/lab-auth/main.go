@@ -16,7 +16,7 @@ import (
 	"github.com/example-org/example-blog/services/lab-auth/internal/store"
 )
 
-const version = "0.4.0"
+const version = "0.5.0"
 
 var errUsage = errors.New("usage")
 
@@ -42,10 +42,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case "version":
 		fmt.Fprintln(stdout, version)
 		return nil
+	// Canonical grouped form.
+	case "user":
+		return cmdUser(args[1:], stdin, stdout, stderr)
+	case "session":
+		return cmdSession(args[1:], stdout, stderr)
+	case "audit":
+		return cmdAudit(args[1:], stdout)
+	case "db":
+		return cmdDB(args[1:], stdout)
+	// Compatibility aliases: deployment scripts and older runbooks call the flat
+	// form, and `migrate`/`backup`/`restore` are one-shot operations anyway.
 	case "migrate":
 		return cmdMigrate(args[1:], stdout)
-	case "user":
-		return cmdUser(args[1:], stdin, stdout)
 	case "backup":
 		return cmdBackup(args[1:], stdout)
 	case "restore":
@@ -59,24 +68,40 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `lab-auth - Rhine Lab boot identity account CLI
+	fmt.Fprint(w, `lab-auth - Rhine Lab account service and account CLI
 
 Usage:
   lab-auth help
   lab-auth version
-  lab-auth serve          [-insecure-cookies]
-  lab-auth migrate        -db <path>
-  lab-auth user create    -db <path> <username>
-  lab-auth user list      -db <path>
-  lab-auth user disable   -db <path> <username>
-  lab-auth user enable    -db <path> <username>
-  lab-auth user reset-password -db <path> <username>
-  lab-auth user revoke-sessions <username>
-  lab-auth backup         -db <path> -out <file>
-  lab-auth restore        -src <file> -db <path>
+  lab-auth serve [-insecure-cookies]
 
-Passwords are read from the terminal (hidden, twice) or from piped stdin.
-There is intentionally no --password flag.
+  lab-auth user create          -db <path> <username>
+  lab-auth user list            -db <path> [-search <text>] [-enabled true|false]
+  lab-auth user show            -db <path> <username|user-id>
+  lab-auth user enable          -db <path> <username|user-id>
+  lab-auth user disable         -db <path> <username|user-id>
+  lab-auth user reset-password  -db <path> <username|user-id>
+  lab-auth user revoke-sessions -db <path> <username|user-id>
+  lab-auth user delete          -db <path> <username|user-id> [-force]
+
+  lab-auth session list         -db <path> [-user <ref>] [-state pending|active|revoked]
+  lab-auth session revoke       -db <path> <username|user-id>
+  lab-auth audit list           -db <path> [-target <key>] [-action <action>]
+
+  lab-auth db status            -db <path>
+  lab-auth db verify            -db <path>
+  lab-auth db migrate           -db <path>
+  lab-auth db backup            -db <path> -out <file>
+  lab-auth db restore           -src <file> -db <path>
+
+  lab-auth migrate|backup|restore   aliases for the matching "db" verbs
+
+Flags come before positional arguments (standard Go flag parsing), so write
+"lab-auth user show -db auth.db -json joyce", not "... joyce -json".
+Every command accepts -json for machine-readable output. -db falls back to
+LAB_AUTH_DB. Passwords are read from the terminal (hidden, twice) or from piped
+stdin; there is intentionally no --password flag. Mutating commands append one
+audit row with actor cli:<os user>, the same trail the admin API writes.
 `)
 }
 
@@ -127,93 +152,6 @@ func cmdMigrate(args []string, stdout io.Writer) error {
 	}
 	fmt.Fprintf(stdout, "migrated %s to schema v%d\n", path, v)
 	return nil
-}
-
-func cmdUser(args []string, stdin io.Reader, stdout io.Writer) error {
-	if len(args) == 0 {
-		return errors.New("user subcommand required")
-	}
-	sub, rest := args[0], args[1:]
-	fs := newFlagSet("user " + sub)
-	db := fs.String("db", "", "database path (or LAB_AUTH_DB)")
-	if err := fs.Parse(rest); err != nil {
-		return err
-	}
-	path, err := resolveDB(*db)
-	if err != nil {
-		return err
-	}
-	username := strings.TrimSpace(fs.Arg(0))
-
-	s, err := openStore(path)
-	if err != nil {
-		return err
-	}
-	defer s.Close()
-
-	switch sub {
-	case "create", "reset-password":
-		if username == "" {
-			return errors.New("username required")
-		}
-		plain, err := readPasswordTwice(stdin, stdout)
-		if err != nil {
-			return err
-		}
-		if sub == "create" {
-			user, err := s.CreateUser(username, plain)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(stdout, "created %s (id %s)\n", user.Username, user.ID)
-		} else {
-			if err := s.ResetPassword(username, plain); err != nil {
-				return err
-			}
-			fmt.Fprintf(stdout, "password reset for %s; sessions revoked\n", username)
-		}
-		return nil
-	case "list":
-		users, err := s.ListUsers()
-		if err != nil {
-			return err
-		}
-		for _, u := range users {
-			state := "disabled"
-			if u.Enabled {
-				state = "enabled"
-			}
-			fmt.Fprintf(stdout, "%s\t%s\t%s\tv%d\n", u.ID, u.Username, state, u.CredentialVersion)
-		}
-		fmt.Fprintf(stdout, "%d user(s)\n", len(users))
-		return nil
-	case "disable", "enable":
-		if username == "" {
-			return errors.New("username required")
-		}
-		enabled := sub == "enable"
-		if err := s.SetEnabled(username, enabled); err != nil {
-			return err
-		}
-		fmt.Fprintf(stdout, "%sd %s; sessions revoked\n", sub, username)
-		return nil
-	case "revoke-sessions":
-		if username == "" {
-			return errors.New("username required")
-		}
-		user, _, err := s.GetUserByKey(username)
-		if err != nil {
-			return err
-		}
-		n, err := s.RevokeSessions(user.ID)
-		if err != nil {
-			return err
-		}
-		fmt.Fprintf(stdout, "revoked %d session(s) for %s\n", n, username)
-		return nil
-	default:
-		return fmt.Errorf("unknown user subcommand %q", sub)
-	}
 }
 
 func cmdBackup(args []string, stdout io.Writer) error {

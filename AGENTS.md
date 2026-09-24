@@ -72,8 +72,10 @@ TypeScript / Three.js 三维界面作为独立的 `/lab/` 入口。
   单元，只通过 `index.ts` 对外暴露「宿主端口 + 门面」。上游自带文件保持原路径不动，因此上游同步仍是
   逐文件内容级移植。功能清单在 `features.manifest.json`，边界由 `npm run check:features` 校验；
   约定与增删流程见 [docs/FEATURES.md](docs/FEATURES.md) 与 [src/features/README.md](src/features/README.md)。
-- `ops/`：参数化部署、Web 配置、回滚与 smoke 工具；`services/lab-auth/`：认证服务源码。
-- `shared/`：博客构建与三维入口共用的库（阅读层纯逻辑、字体 CSS）；不放只服务单一功能的代码。
+- `ops/`：参数化部署、Web 配置、回滚与 smoke 工具；`services/lab-auth/`：账号服务源码
+  （登录/注册接口 + `/admin/*` 管理 API + `lab-auth` CLI）。
+- `shared/`：跨界面共用的库：`shared/reading/`（阅读层纯逻辑）、`shared/auth/`（账号规则、
+  API 客户端与会话桥）、字体 CSS。博客静态页与三维入口引用同一份实现。
 - `art/`、`reference/`、`verification/`：模型工程、开发对照与验证入口。
 - `.generated/`、`dist/`、`release/` 与构建产物不作为正文来源，且不进 Git。
 
@@ -108,6 +110,7 @@ TypeScript / Three.js 三维界面作为独立的 `/lab/` 入口。
 npm ci --ignore-scripts
 npm run check:content          # 内容 schema、路径、草稿、封面、主题引用
 npm run check:features         # 功能模块边界：入口唯一、无跨功能穿透、无孤儿文件
+npm run check:account          # 账号端到端：CLI 建号 + 博客登录 + /lab/ 共享同一会话（需 Go）
 npm run test:blog              # 内容契约单元测试
 npm run typecheck              # 三维 TypeScript 检查
 npm run test:reader            # 沉浸式阅读契约/加载器/面板单元测试

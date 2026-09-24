@@ -36,6 +36,11 @@ type Options struct {
 	Now             func() time.Time
 	MaxBuckets      int
 	Logger          *slog.Logger
+	// Version is reported by GET {base}/admin/status; empty means "dev".
+	Version string
+	// Admin overrides the persistence used by the admin API. Nil derives it from
+	// the store, which is what production does.
+	Admin *AdminDeps
 }
 
 type Server struct {
@@ -45,6 +50,8 @@ type Server struct {
 	insecure bool
 	logger   *slog.Logger
 	mux      *http.ServeMux
+	version  string
+	admin    *AdminDeps
 
 	hashes         hashPool
 	registerHashes hashPool
@@ -116,24 +123,55 @@ func New(cfg config.Config, st *store.Store, opts Options) (*Server, error) {
 		insecure:       opts.InsecureCookies,
 		logger:         logger,
 		mux:            http.NewServeMux(),
+		version:        opts.Version,
 		hashes:         newHashPool(cfg.HashConcurrency, cfg.HashQueue),
 		registerHashes: newHashPool(1, 2),
 		source:         ratelimit.New(maxBuckets, now),
 		registerSource: ratelimit.New(maxBuckets, now),
 		username:       ratelimit.New(maxBuckets, now),
 	}
+	if s.version == "" {
+		s.version = "dev"
+	}
+	if opts.Admin != nil {
+		s.admin = opts.Admin
+	} else if st != nil {
+		s.admin = &AdminDeps{Accounts: st, Audit: st, Sessions: st, Status: st.Status}
+	}
 	s.routes()
 	return s, nil
 }
 
+// apiPrefixes are the mounted prefixes for the same contract. `/api/auth` is the
+// canonical, surface-neutral path (the blog and the 3D archive are both clients);
+// `/lab/api/auth` stays mounted so a not-yet-updated client, a cached bundle or
+// an older nginx fragment keeps working during a release.
+var apiPrefixes = []string{"/api/auth", "/lab/api/auth"}
+
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /lab/api/auth/csrf", s.handleCSRF)
-	s.mux.HandleFunc("POST /lab/api/auth/register", s.handleRegister)
-	s.mux.HandleFunc("POST /lab/api/auth/login", s.handleLogin)
-	s.mux.HandleFunc("POST /lab/api/auth/confirm", s.handleConfirm)
-	s.mux.HandleFunc("GET /lab/api/auth/session", s.handleSession)
-	s.mux.HandleFunc("POST /lab/api/auth/cancel", s.handleCancel)
-	s.mux.HandleFunc("POST /lab/api/auth/logout", s.handleLogout)
+	for _, base := range apiPrefixes {
+		s.mux.HandleFunc("GET "+base+"/csrf", s.handleCSRF)
+		s.mux.HandleFunc("POST "+base+"/register", s.handleRegister)
+		s.mux.HandleFunc("POST "+base+"/login", s.handleLogin)
+		s.mux.HandleFunc("POST "+base+"/confirm", s.handleConfirm)
+		s.mux.HandleFunc("GET "+base+"/session", s.handleSession)
+		s.mux.HandleFunc("POST "+base+"/cancel", s.handleCancel)
+		s.mux.HandleFunc("POST "+base+"/logout", s.handleLogout)
+
+		s.mux.HandleFunc("GET "+base+"/admin/status", s.handleAdminStatus)
+		s.mux.HandleFunc("GET "+base+"/admin/users", s.handleAdminListUsers)
+		s.mux.HandleFunc("POST "+base+"/admin/users", s.handleAdminCreateUser)
+		s.mux.HandleFunc("GET "+base+"/admin/users/{ref}", s.handleAdminGetUser)
+		s.mux.HandleFunc("DELETE "+base+"/admin/users/{ref}", s.handleAdminDeleteUser)
+		// Explicit verbs instead of a `{state}` wildcard: a wildcard would turn any
+		// unknown suffix into "disable", and a typo would silently disable an account.
+		s.mux.HandleFunc("POST "+base+"/admin/users/{ref}/enable", s.handleAdminEnableUser)
+		s.mux.HandleFunc("POST "+base+"/admin/users/{ref}/disable", s.handleAdminDisableUser)
+		s.mux.HandleFunc("POST "+base+"/admin/users/{ref}/password", s.handleAdminResetPassword)
+		s.mux.HandleFunc("POST "+base+"/admin/users/{ref}/sessions/revoke", s.handleAdminRevokeSessions)
+		s.mux.HandleFunc("GET "+base+"/admin/audit", s.handleAdminListAudit)
+		s.mux.HandleFunc("GET "+base+"/admin/sessions", s.handleAdminListSessions)
+	}
 	s.mux.HandleFunc("GET /health/live", s.handleLive)
 	s.mux.HandleFunc("GET /health/ready", s.handleReady)
 }

@@ -11,4 +11,5 @@ import "./intro.css";
 export { createEntryFeature } from "./entry";
 export type { EntryFeature, EntryHost, EntryReviewSnapshot, StageRect } from "./entry";
 export { HANDOFF_APP_TIME } from "./intro-motion";
-export type { BootIdentity, ChosenIdentity, EntryPanelPhase, IntroPhase } from "./identity";
+export type { BootIdentity, ChosenIdentity } from "../../../shared/auth/identity";
+export type { EntryPanelPhase, IntroPhase } from "./identity";

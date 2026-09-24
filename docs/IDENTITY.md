@@ -4,8 +4,10 @@
 认证是**可选组件**——服务不可用时 GUEST 与全部公开阅读仍然可用，认证故障不会影响博客。
 
 前端是一个自包含功能模块 `src/features/auth/`：`entry.ts` 是身份门状态机与宿主端口契约，
-`intro.ts` 是序幕幕布、`panel.ts` 是登录/注册面板、`identity.ts` 是纯规则、`client.ts` 是同源
-认证端口。模块边界、`EntryHost` 端口与增删流程见 [FEATURES.md](FEATURES.md)。
+`intro.ts` 是序幕幕布、`panel.ts` 是登录/注册面板、`identity.ts` 是 lab 侧阶段表、
+`client.ts` 所属的账号规则与协议客户端在 `shared/auth/`（博客页共用同一实现）。
+模块边界、`EntryHost` 端口与增删流程见 [FEATURES.md](FEATURES.md)；账号数据库的管理
+（CLI 与管理 API）见本文 §8，与博客共享登录态见 §9。
 
 ## 1. 三种身份
 
@@ -114,35 +116,92 @@ ready 之前表单为 inert；登录页按 `Esc` 取消进行中的登录并留�
 8. 离线取消只标记待确认，仅持久化不含秘密的 `attemptId`；恢复后核对 session。
    **不把 `AbortController` 当作服务端撤销。**
 
-## 8. 部署与运维
+## 8. 账号管理（CLI 与管理 API）
+
+账号数据库的增删改查有两条等价通道，字段与语义一致，脚本可以在两者之间切换：
+命令行（`lab-auth user|session|audit|db`）与 HTTP 管理接口（`{base}/admin/*`）。
+
+**前缀**：规范前缀是 `/api/auth`——博客静态页与 `/lab/` 三维档案都是同一个账号服务的
+客户端，共用同一个 `__Host-lab-session` Cookie。`/lab/api/auth/` 仍然挂载为兼容别名
+（服务端两条前缀都注册，`ops/nginx/auth-location.conf` 同时代理），供未更新的客户端跨发布使用。
+
+**管理接口**（契约见 [services/lab-auth/openapi.yaml](../services/lab-auth/openapi.yaml)）：
+
+| 操作 | 接口 |
+| --- | --- |
+| 状态 | `GET /admin/status`（版本、schema、账号/会话/审计计数） |
+| 列表 / 单条 | `GET /admin/users`（`search`、`enabled`、`limit`、`offset`）、`GET /admin/users/{ref}` |
+| 建号 | `POST /admin/users` `{username,password}` |
+| 启停 | `POST /admin/users/{ref}/enable`、`/disable` |
+| 重置密码 | `POST /admin/users/{ref}/password` `{password}` |
+| 撤销会话 | `POST /admin/users/{ref}/sessions/revoke`、会话列表 `GET /admin/sessions` |
+| 删除 | `DELETE /admin/users/{ref}`（最后一个可用账号需 `?force=1`） |
+| 审计 | `GET /admin/audit`（`target`、`action`、`limit`、`offset`） |
+
+- **默认关闭**：未设置 `LAB_AUTH_ADMIN_TOKEN` 时这些路由返回 503 `admin_disabled`，
+  不会退化成无鉴权接口。令牌至少 32 字符，恒定时间比较，缺失/错误统一 401。
+- 接口**只认 Bearer 令牌、不读 Cookie**，因此浏览器会话或 XSS 都无法调用管理面，
+  也不存在 CSRF 面；请求按来源限流。
+- 每次变更写一条审计（actor `admin-api`；CLI 写 `cli:<系统用户>`，动作
+  `user.create|enable|disable|password|delete`、`session.revoke`）。审计表只增不改，
+  删除账号不删除其审计记录。
+- 删除账号会同时删除它的会话与登录尝试（外键没有级联），并在同一事务内完成；
+  删除最后一个可用账号被拒绝，除非显式 `force` / `-force`。
+- 命令行语法统一为 `<组> <动词> [flags] [ref]`，flag 写在位置参数之前，所有命令支持
+  `-json`。命令与输出示例见 [services/lab-auth/README.md](../services/lab-auth/README.md)。
+
+## 9. 与博客共享登录态
+
+- 登录态就是**一个源级 Cookie**：`__Host-lab-session`，`Path=/`、`Secure`、`HttpOnly`、
+  `SameSite=Lax`。博客页与 `/lab/` 同源，因此任一侧登录后另一侧在下次 `GET /session`
+  就能看到同一身份，不存在第二套会话或票据交换。
+- 博客侧页面（静态 HTML）在加载后查询 `GET /api/auth/session`：页头账号控件显示用户名，
+  `/account/` 页显示当前身份与退出按钮。没有 JavaScript 时它们退化为指向 `/account/` 的
+  普通链接，文章阅读完全不受影响。
+- 同一浏览器的多个标签页通过 `BroadcastChannel("rhine-auth")`（不支持时退回 `storage`
+  事件）即时同步登录/退出；`/lab/` 在启动时读取同一 Cookie 并据此提供
+  「CONTINUE AS <用户名>」。
+- 前端共享实现在 `shared/auth/`：`identity.ts` 规则、`client.ts` 协议客户端、
+  `session.ts` 会话桥（缓存、登录/退出、跨标签同步）。三维入口的功能模块
+  `src/features/auth/` 与博客的 `apps/blog/src/scripts/account.ts` 都用它，不各自实现协议。
+- 安全边界不变：身份只作展示与交互状态，权限始终由服务端会话决定；两端都不缓存密码。
+
+## 10. 部署与运维
 
 - 服务用户独立于网页账号（nologin），二进制放 `/srv/example-blog-auth/releases/<版本>/`，
   用 `current` 软链切换；配置放 `/etc/example-blog-auth/auth.env`（0640），
   数据放 `/var/lib/example-blog-auth/`（0600）。
-- 服务只监听 **unix socket**，由 nginx 代理 `/lab/api/auth/`，不直接暴露端口。
+- 服务只监听 **unix socket**，由 nginx 代理 `/api/auth/`（兼容前缀 `/lab/api/auth/`），
+  不直接暴露端口。建议在 nginx 层限制或仅内网开放 `/api/auth/admin/`。
 - unit 模板见 `ops/systemd/example-auth*.{service,timer}`，脚本见 `ops/auth/`
   （`prepare.sh` / `activate.sh` / `rollback.sh` / `backup.sh` / `healthcheck.sh`）。
 - 备份使用一致性快照（SQLite `VACUUM INTO`）并对快照做完整性校验；
   `example-auth-backup.timer` 每日执行并保留最近若干份。
 - 只关闭注册时，优先把 `LAB_AUTH_REGISTRATION_ENABLED` 置 0 并重启服务——登录与 GUEST 不受影响。
+- 数据库 schema 由 `schema_migrations` 版本化并校验 SHA-256：已发布迁移不可修改，
+  只能追加 `000N_*.sql`；校验和不符时服务拒绝启动。期望版本取
+  `store.LatestSchemaVersion()`，不要写死。
 
-## 9. 测试与验证
+## 11. 测试与验证
 
 ```bash
-npm run test:identity     # 用户名/展示名规则
+npm run test:identity     # 用户名/展示名规则（shared/auth/identity.ts）
 npm run test:entry        # 身份时间线（帧点、打字节奏、标签派生）
 npm run test:login-e2e    # 登录/注册端到端（Playwright）
 npm run check:flow        # 认证流程契约
+npm run check:account     # 账号端到端：CLI 建号 + 博客登录 + /lab/ 共享同一会话（需 Go）
 npm run check:artifacts   # 构建产物与配置检查
 npm run bench:auth        # 认证容量压测（隔离库）
 npm run test:packaging    # 打包与配对（需要 Go 工具链构建二进制）
 ```
 
-测试要覆盖：大小写用户名、保留名、边界长度、密码空格与 Unicode、错误密码、停用、
-重置后旧密码失效、重复迁移、隔离备份恢复、以及 CLI 不回显密码。
-测试账号应随机生成且只写入隔离数据库——**源码与文档里不放长期凭据**。
+服务端自身：`cd services/lab-auth && go vet ./... && go test ./...`。测试要覆盖：
+大小写用户名、保留名、边界长度、密码空格与 Unicode、错误密码、停用、重置后旧密码失效、
+重复迁移、隔离备份恢复、账号删除的连带行与最后一个账号保护、审计流水、管理接口的
+令牌与禁用分支，以及 CLI 不回显密码。测试账号应随机生成且只写入隔离数据库——
+**源码与文档里不放长期凭据**。
 
-## 10. 相关文档
+## 12. 相关文档
 
 - [docs/README.md](README.md)：文档索引
 - [FEATURES.md](FEATURES.md)：功能模块划分（`auth` 模块的端口、门面与增删流程）

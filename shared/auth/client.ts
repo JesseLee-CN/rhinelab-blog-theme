@@ -1,10 +1,17 @@
-// Real same-origin client for /lab/api/auth/ (G1 contract + register-v1). The
-// UI talks to an IdentityPort so DEV browser checks can substitute a mock while
-// production always uses this client.
+// Same-origin auth client for the account API. Shared by the blog pages and the
+// /lab/ archive so both speak one protocol: `GET /csrf` opens a flow, `POST
+// /login` verifies, `POST /confirm` establishes the session cookie, and
+// `GET /session` reports it.
 //
 // Flow state is keyed by attemptId: a late openFlow/cancel completion can only
 // clean up its own context and never clobber a newer attempt.
+//
+// The base prefix is the canonical `/api/auth`; the service also mounts the
+// legacy `/lab/api/auth` so an older bundle keeps working during a release.
 import type { BootIdentity } from "./identity";
+
+export const AUTH_BASE = "/api/auth";
+export const LEGACY_AUTH_BASE = "/lab/api/auth";
 
 export interface PublicUser {
   id: string;
@@ -79,11 +86,11 @@ const STATUS_CODES: Record<number, AuthErrorCode> = {
   503: "unavailable",
 };
 
-// Each network step gets its own deadline; BootEntry adds the 20s attempt budget.
+// Each network step gets its own deadline; callers add their own attempt budget.
 const STEP_TIMEOUT_MS = 10_000;
 const MAX_FLOWS = 8;
 
-export function createAuthClient(base = "/lab/api/auth"): IdentityPort {
+export function createAuthClient(base = AUTH_BASE): IdentityPort {
   const flows = new Map<string, { csrfToken: string }>();
 
   function remember(attemptId: string, csrfToken: string): void {

@@ -50,6 +50,12 @@ type Config struct {
 	RegisterSourceHourly int
 	RegisterGlobalDaily  int
 	RegisterMaxUsers     int
+
+	// Account management API (/api/auth/admin/...). Disabled while empty: the
+	// endpoints exist but answer 503, so no deployment grows an unauthenticated
+	// management surface by accident.
+	AdminToken string
+	AdminRate  int
 }
 
 func Load(getenv func(string) string) (Config, error) {
@@ -77,6 +83,8 @@ func Load(getenv func(string) string) (Config, error) {
 		RegisterSourceHourly: 10,
 		RegisterGlobalDaily:  200,
 		RegisterMaxUsers:     5000,
+
+		AdminRate: 60,
 	}
 	if v := strings.TrimSpace(getenv("LAB_AUTH_ENV")); v != "" {
 		cfg.Env = Env(v)
@@ -168,6 +176,13 @@ func Load(getenv func(string) string) (Config, error) {
 	}); err != nil {
 		return Config{}, err
 	}
+	cfg.AdminToken = strings.TrimSpace(getenv("LAB_AUTH_ADMIN_TOKEN"))
+	if err := applyInt(getenv, "LAB_AUTH_ADMIN_RATE", func(n int) error {
+		cfg.AdminRate = n
+		return nil
+	}); err != nil {
+		return Config{}, err
+	}
 	return cfg, nil
 }
 
@@ -215,6 +230,14 @@ func (c Config) Validate() error {
 	}
 	if c.RegisterMaxUsers < 1 || c.RegisterMaxUsers > 10000000 {
 		return fmt.Errorf("config: unreasonable RegisterMaxUsers %d", c.RegisterMaxUsers)
+	}
+	// A management token is optional, but a weak one is worse than none: 32
+	// characters is the shortest value that is plausibly random.
+	if c.AdminToken != "" && len(c.AdminToken) < 32 {
+		return fmt.Errorf("config: LAB_AUTH_ADMIN_TOKEN must be at least 32 characters (or unset to disable the admin API)")
+	}
+	if c.AdminRate < 1 || c.AdminRate > 100000 {
+		return fmt.Errorf("config: unreasonable AdminRate %d", c.AdminRate)
 	}
 	if _, err := password.Hash("config-validation-only", c.Argon); err != nil {
 		return err

@@ -1,18 +1,28 @@
 openapi: 3.1.0
 info:
-  title: Rhine Lab boot identity API
-  version: "1.0.0"
+  title: Rhine Lab account API
+  version: "1.1.0"
   description: >-
-    G1 frozen contract for the /lab/ boot identity flow, with the additive
-    register-v1 extension (service 0.4.0+, LOGIN-IMPROVE L1a). Implemented by
-    services/lab-auth (Go). All paths are exact under /lab/api/auth/. All
-    responses are Cache-Control: no-store. Errors never echo passwords or
-    distinguish "unknown user" from "wrong password". Registration is not
-    login: POST /register creates a persistent account and never sets or
-    changes a session cookie.
-x-lab-features: ["register-v1"]
+    Account contract for every surface of the site. The login flow below is the
+    frozen G1 contract with the additive register-v1 extension (service 0.4.0+,
+    LOGIN-IMPROVE L1a); the /admin/* operations are the account-management API
+    (service 0.5.0+). Implemented by services/lab-auth (Go).
+
+    The canonical prefix is /api/auth because both the static blog pages and the
+    /lab/ archive are clients of the same service and share one
+    `__Host-lab-session` cookie on this origin; /lab/api/auth is still mounted as
+    a deprecated alias for clients older than the current release.
+
+    All responses are Cache-Control: no-store. Errors never echo passwords or
+    distinguish "unknown user" from "wrong password". Registration is not login:
+    POST /register creates a persistent account and never sets or changes a
+    session cookie. The admin API is cookie-less (bearer token only) and answers
+    503 while no LAB_AUTH_ADMIN_TOKEN is configured.
+x-lab-features: ["register-v1", "admin-v1"]
 servers:
+  - url: /api/auth
   - url: /lab/api/auth
+    description: Deprecated alias kept for clients older than the current release.
 paths:
   /csrf:
     get:
@@ -173,13 +183,247 @@ paths:
           }
         "403": { $ref: "#/components/responses/Forbidden" }
         "503": { $ref: "#/components/responses/Unavailable" }
+  # --- account management (admin-v1) -----------------------------------------
+  # Bearer-token only; session cookies are ignored, so a browser session cannot
+  # manage accounts and no CSRF token applies. Every mutation appends one audit
+  # row with actor "admin-api". Answers 503 admin_disabled while no
+  # LAB_AUTH_ADMIN_TOKEN is configured.
+  /admin/status:
+    get:
+      summary: Service and database status
+      operationId: adminStatus
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: Status document.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminStatus" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/users:
+    get:
+      summary: List accounts
+      operationId: adminListUsers
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string }, description: Case-insensitive username substring. }
+        - { name: enabled, in: query, schema: { type: string, enum: ["true", "false"] } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: One page of accounts, newest ordering by username.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserPage" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+    post:
+      summary: Create an account
+      operationId: adminCreateUser
+      security: [{ adminToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string, description: Never logged or echoed. }
+      responses:
+        "201":
+          description: Account created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/users/{ref}:
+    parameters:
+      - $ref: "#/components/parameters/AccountRef"
+    get:
+      summary: Show one account
+      operationId: adminGetUser
+      security: [{ adminToken: [] }]
+      responses:
+        "200":
+          description: The account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+    delete:
+      summary: Delete an account and its sessions
+      operationId: adminDeleteUser
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: force, in: query, schema: { type: boolean }, description: Required to delete the last enabled account. }
+      responses:
+        "200":
+          description: The deleted account. The audit row keeps its username.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/users/{ref}/enable:
+    post:
+      summary: Enable an account
+      operationId: adminEnableUser
+      security: [{ adminToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountRef"
+      responses:
+        "200":
+          description: The updated account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/users/{ref}/disable:
+    post:
+      summary: Disable an account and revoke its sessions
+      operationId: adminDisableUser
+      security: [{ adminToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountRef"
+      responses:
+        "200":
+          description: The updated account.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/users/{ref}/password:
+    post:
+      summary: Reset a password and revoke that account's sessions
+      operationId: adminResetPassword
+      security: [{ adminToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountRef"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [password]
+              properties:
+                password: { type: string, description: Never logged or echoed. }
+      responses:
+        "200":
+          description: The updated account; the credential version is bumped.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminUserEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/users/{ref}/sessions/revoke:
+    post:
+      summary: Revoke every session of one account
+      operationId: adminRevokeSessions
+      security: [{ adminToken: [] }]
+      parameters:
+        - $ref: "#/components/parameters/AccountRef"
+      responses:
+        "200":
+          description: The account and how many sessions were revoked.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, revoked]
+                properties:
+                  user: { $ref: "#/components/schemas/AdminUser" }
+                  revoked: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/sessions:
+    get:
+      summary: List sessions across accounts
+      operationId: adminListSessions
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: user, in: query, schema: { type: string }, description: Username or user id. }
+        - { name: state, in: query, schema: { type: string, enum: [pending, active, revoked] } }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: Session rows with their account username.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessions]
+                properties:
+                  sessions:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminSession" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
+  /admin/audit:
+    get:
+      summary: Read the account-management audit trail (newest first)
+      operationId: adminListAudit
+      security: [{ adminToken: [] }]
+      parameters:
+        - { name: target, in: query, schema: { type: string }, description: Username key. }
+        - { name: action, in: query, schema: { type: string }, description: "user.create | user.enable | user.disable | user.password | user.delete | session.revoke" }
+        - { name: limit, in: query, schema: { type: integer, default: 100, maximum: 500 } }
+        - { name: offset, in: query, schema: { type: integer, default: 0 } }
+      responses:
+        "200":
+          description: Audit rows.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items: { $ref: "#/components/schemas/AdminAuditEntry" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "503": { $ref: "#/components/responses/AdminDisabled" }
 components:
+  securitySchemes:
+    adminToken:
+      type: http
+      scheme: bearer
+      description: LAB_AUTH_ADMIN_TOKEN. Never sent by a browser client.
   parameters:
     CsrfToken:
       name: X-CSRF-Token
       in: header
       required: true
       schema: { type: string }
+    AccountRef:
+      name: ref
+      in: path
+      required: true
+      schema: { type: string }
+      description: Username (any case) or user id.
   schemas:
     User:
       type: object
@@ -263,6 +507,83 @@ components:
       properties:
         registered: { type: boolean, const: true }
         user: { $ref: "#/components/schemas/User" }
+    # --- admin-v1 models ---------------------------------------------------
+    AdminUser:
+      type: object
+      required: [id, username, enabled, credentialVersion, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        username: { type: string }
+        enabled: { type: boolean }
+        credentialVersion: { type: integer }
+        createdAt: { type: integer, description: Unix seconds }
+        updatedAt: { type: integer, description: Unix seconds }
+    AdminUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/AdminUser" }
+    AdminUserPage:
+      type: object
+      required: [users, total, limit, offset]
+      properties:
+        users:
+          type: array
+          items: { $ref: "#/components/schemas/AdminUser" }
+        total: { type: integer, description: Unpaginated total for the same filter }
+        limit: { type: integer }
+        offset: { type: integer }
+    AdminSession:
+      type: object
+      required: [id, userId, username, state, createdAt, lastSeenAt, idleExpiresAt, absoluteExpiresAt]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        username: { type: string }
+        state: { type: string, enum: [pending, active, revoked] }
+        createdAt: { type: integer }
+        lastSeenAt: { type: integer }
+        idleExpiresAt: { type: integer }
+        absoluteExpiresAt: { type: integer }
+    AdminAuditEntry:
+      type: object
+      required: [id, at, actor, action, target, detail]
+      properties:
+        id: { type: string }
+        at: { type: integer, description: Unix seconds }
+        actor: { type: string, description: "admin-api, cli:<os user> or system" }
+        action: { type: string }
+        target: { type: string, description: Username key; survives account deletion }
+        detail: { type: string }
+    AdminStatus:
+      type: object
+      required: [service, database]
+      properties:
+        service:
+          type: object
+          required: [version, env, adminEnabled, registration, now]
+          properties:
+            version: { type: string }
+            env: { type: string, enum: [development, production] }
+            adminEnabled: { type: boolean, const: true }
+            registration: { type: boolean }
+            now: { type: integer }
+        database:
+          type: object
+          required: [path, schemaVersion, migratedAt, users, enabled, disabled, sessions, auditEntries]
+          properties:
+            path: { type: string }
+            schemaVersion: { type: integer }
+            migratedAt: { type: integer }
+            users: { type: integer }
+            enabled: { type: integer }
+            disabled: { type: integer }
+            sessions:
+              type: object
+              properties:
+                active: { type: integer }
+                pending: { type: integer }
+            auditEntries: { type: integer }
     SessionResponse:
       oneOf:
         - type: object
@@ -288,7 +609,9 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Unauthorized:
-      description: Credentials rejected. Never reveals whether the username exists.
+      description: >-
+        Login: credentials rejected; never reveals whether the username exists.
+        Admin: missing or wrong bearer token; never says which.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -298,7 +621,9 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     Conflict:
-      description: Attempt already cancelled/confirmed/expired.
+      description: >-
+        Login: attempt already cancelled/confirmed/expired. Admin: username
+        taken, or the last enabled account deleted without force.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
@@ -320,13 +645,25 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: No such account. Code not_found.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    AdminDisabled:
+      description: >-
+        No LAB_AUTH_ADMIN_TOKEN is configured. The management surface is off,
+        not missing.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     PayloadTooLarge:
       description: Request body exceeds 4 KiB.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }
     RateLimited:
-      description: Source or username bucket exhausted.
+      description: Source, username or admin bucket exhausted.
       headers:
         Retry-After: { schema: { type: integer } }
       content:

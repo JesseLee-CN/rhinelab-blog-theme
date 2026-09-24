@@ -65,6 +65,9 @@ const ogImageUrl = ogImage ? new URL(ogImage, site).href : undefined;
         <a href="/search/">搜索</a>
         <a href="/rss.xml">RSS</a>
         <a href="/lab/">三维档案</a>
+        <!-- 账号入口：无 JS 时是普通链接；有 JS 时显示当前用户名，
+             与 /lab/ 共用同一个 __Host-lab-session Cookie。 -->
+        <a class="account-link" href="/account/" data-account-link data-account-state="signed-out">登录</a>
       </nav>
     </header>
     <main id="main">
@@ -75,5 +78,9 @@ const ogImageUrl = ogImage ? new URL(ogImage, site).href : undefined;
     <!-- 备案信息（按需填写）：若站点在中国大陆备案，可在此处放回工信部备案号与公安备案号。
          本模板默认不包含任何备案号与备案图标。 -->
     </footer>
+    <script>
+      // 账号岛：页头控件与 /account/ 表单共用一份实现。文章正文在不加载它时依然完整可读。
+      import "../scripts/account";
+    </script>
   </body>
 </html>

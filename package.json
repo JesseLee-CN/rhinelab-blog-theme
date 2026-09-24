@@ -46,6 +46,7 @@
     "build:lab": "npm run prepare:assets && vite build --config vite.lab.config.ts",
     "search:index": "node scripts/blog/search-index.mjs",
     "check:site": "node --experimental-strip-types scripts/blog/check-site.mjs",
+    "check:account": "node scripts/blog/check-account.mjs",
     "build": "node scripts/blog/build-site.mjs",
     "release": "node scripts/blog/package-release.mjs",
     "preview": "node scripts/blog/preview.mjs",

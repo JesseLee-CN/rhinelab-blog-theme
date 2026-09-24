@@ -8,10 +8,10 @@ import {
   validatePassword,
   validateUsername,
   type ChosenIdentity,
-  type EntryPanelPhase,
   type UsernameError,
-} from "./identity";
-import { AuthError, type IdentityPort, type PublicUser } from "./client";
+} from "../../../shared/auth/identity";
+import { AuthError, type IdentityPort, type PublicUser } from "../../../shared/auth/client";
+import type { EntryPanelPhase } from "./identity";
 
 export interface BootEntryOptions {
   mount: HTMLElement;

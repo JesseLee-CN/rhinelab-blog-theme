@@ -177,6 +177,20 @@ func (s *Store) SchemaVersion() (int, error) {
 	return int(version.Int64), nil
 }
 
+// LatestSchemaVersion is the version a fully migrated database must report. It is
+// derived from the embedded migrations so adding one never leaves a stale literal
+// behind in tests or in the admin status output.
+func LatestSchemaVersion() (int, error) {
+	list, err := loadMigrations()
+	if err != nil {
+		return 0, err
+	}
+	if len(list) == 0 {
+		return 0, nil
+	}
+	return list[len(list)-1].version, nil
+}
+
 func randomID(prefix string, byteLen int) (string, error) {
 	buf := make([]byte, byteLen)
 	if _, err := rand.Read(buf); err != nil {

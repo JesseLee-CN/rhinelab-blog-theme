@@ -26,13 +26,24 @@ func openTest(t *testing.T) *Store {
 	return s
 }
 
+// latestSchemaVersion keeps these assertions valid when a migration is added:
+// the expected value comes from the embedded migrations, not from a literal.
+func latestSchemaVersion(t *testing.T) int {
+	t.Helper()
+	version, err := LatestSchemaVersion()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return version
+}
+
 func TestMigrateIsIdempotent(t *testing.T) {
 	s := openTest(t)
 	if err := s.Migrate(); err != nil {
 		t.Fatalf("second migrate: %v", err)
 	}
 	version, err := s.SchemaVersion()
-	if err != nil || version != 1 {
+	if err != nil || version != latestSchemaVersion(t) {
 		t.Fatalf("schema version = %d, err %v", version, err)
 	}
 }
@@ -204,7 +215,7 @@ func TestReopenPersistsUsersAndFlows(t *testing.T) {
 	if _, err := reopened.GetFlowByToken(flowToken, now); err != nil {
 		t.Fatalf("flow lost after restart: %v", err)
 	}
-	if version, err := reopened.SchemaVersion(); err != nil || version != 1 {
+	if version, err := reopened.SchemaVersion(); err != nil || version != latestSchemaVersion(t) {
 		t.Fatalf("schema version = %d, err %v", version, err)
 	}
 }
@@ -278,7 +289,7 @@ func TestBackupRestoreRevokesSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !info.IntegrityOK || info.Users != 1 || info.SchemaVersion != 1 {
+	if !info.IntegrityOK || info.Users != 1 || info.SchemaVersion != latestSchemaVersion(t) {
 		t.Fatalf("unexpected backup info: %+v", info)
 	}
 	restored := filepath.Join(dir, "restored.db")

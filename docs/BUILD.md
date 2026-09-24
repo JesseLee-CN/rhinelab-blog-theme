@@ -32,6 +32,7 @@ npm run build:lab
 npm run search:index
 npm run check:site
 npm run typecheck          # 三维 TypeScript 检查
+npm run check:account      # 账号端到端（需 Go 构建 services/lab-auth，且 dist/ 已构建）
 ```
 
 > **Windows 提示**：`npm run build` 通过 `spawnSync` 拉起各步 npm 子进程。若运行环境禁止子进程
@@ -46,6 +47,10 @@ npm run preview 8080       # 指定端口
 
 预览服务直接读 `dist/`：目录请求补 `index.html`，**未知路径返回真实 404**（没有 SPA 回落）。
 `preview.mjs` 只监听 `127.0.0.1`；需要用手机在同网段测试时，把监听地址改成 `0.0.0.0` 后重启。
+
+预览不接入账号服务：`/api/auth/session` 固定回答「未登录」（页头因此显示真实的未登录状态，
+而不是在控制台留下 404），登录表单会提示服务不可用，其余 `/api/auth/*` 是真实 404。
+要在这里验证真实登录，用 `npm run check:account`（它会拉起真实服务并反代到静态站点）。
 
 ## 4. 资源白名单
 

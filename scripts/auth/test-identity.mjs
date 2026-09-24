@@ -1,4 +1,6 @@
-// G1 contract tests for the pure identity rules in src/features/auth/identity.ts.
+// G1 contract tests for the pure account rules (shared/auth/identity.ts, used by
+// the blog and the archive alike) and the lab-only phase tables
+// (src/features/auth/identity.ts).
 import assert from "node:assert/strict";
 import test from "node:test";
 import { dirname, resolve } from "node:path";
@@ -6,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import { loadTs } from "./load-ts.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const id = loadTs(resolve(here, "../../src/features/auth/identity.ts"));
+const id = loadTs(resolve(here, "../../shared/auth/identity.ts"));
+const phases = loadTs(resolve(here, "../../src/features/auth/identity.ts"));
 
 test("usernameKey lowercases and usernameLabel uppercases", () => {
   assert.equal(id.usernameKey("Joyce-Moore"), "joyce-moore");
@@ -79,36 +82,36 @@ test("sameIdentity compares registered users by id", () => {
 });
 
 test("intro transitions follow the frozen table", () => {
-  assert.equal(id.canIntroTransition("connecting", "docking"), true);
-  assert.equal(id.canIntroTransition("connecting", "ready"), true);
-  assert.equal(id.canIntroTransition("connecting", "playing"), false);
-  assert.equal(id.canIntroTransition("docking", "ready"), true);
-  assert.equal(id.canIntroTransition("ready", "exiting"), true);
-  assert.equal(id.canIntroTransition("ready", "handoff"), true);
-  assert.equal(id.canIntroTransition("exiting", "handoff"), true);
-  assert.equal(id.canIntroTransition("handoff", "entered"), true);
-  assert.equal(id.canIntroTransition("playing", "ready"), true);
-  assert.equal(id.canIntroTransition("playing", "playing"), true);
-  assert.equal(id.canIntroTransition("entered", "playing"), true);
-  assert.equal(id.canIntroTransition("entered", "connecting"), false);
-  assert.equal(id.canIntroTransition("resource-error", "connecting"), true);
-  assert.equal(id.canIntroTransition("playing", "disposed"), true);
-  assert.equal(id.canIntroTransition("disposed", "connecting"), false);
+  assert.equal(phases.canIntroTransition("connecting", "docking"), true);
+  assert.equal(phases.canIntroTransition("connecting", "ready"), true);
+  assert.equal(phases.canIntroTransition("connecting", "playing"), false);
+  assert.equal(phases.canIntroTransition("docking", "ready"), true);
+  assert.equal(phases.canIntroTransition("ready", "exiting"), true);
+  assert.equal(phases.canIntroTransition("ready", "handoff"), true);
+  assert.equal(phases.canIntroTransition("exiting", "handoff"), true);
+  assert.equal(phases.canIntroTransition("handoff", "entered"), true);
+  assert.equal(phases.canIntroTransition("playing", "ready"), true);
+  assert.equal(phases.canIntroTransition("playing", "playing"), true);
+  assert.equal(phases.canIntroTransition("entered", "playing"), true);
+  assert.equal(phases.canIntroTransition("entered", "connecting"), false);
+  assert.equal(phases.canIntroTransition("resource-error", "connecting"), true);
+  assert.equal(phases.canIntroTransition("playing", "disposed"), true);
+  assert.equal(phases.canIntroTransition("disposed", "connecting"), false);
 });
 
 test("entry panel transitions are login/register only", () => {
-  assert.equal(id.canEntryPanelTransition("login", "register"), true);
-  assert.equal(id.canEntryPanelTransition("register", "login"), true);
-  assert.equal(id.canEntryPanelTransition("login", "login"), false);
+  assert.equal(phases.canEntryPanelTransition("login", "register"), true);
+  assert.equal(phases.canEntryPanelTransition("register", "login"), true);
+  assert.equal(phases.canEntryPanelTransition("login", "login"), false);
 });
 
 test("auth transitions include registering back to idle", () => {
-  assert.equal(id.canAuthTransition("idle", "verifying"), true);
-  assert.equal(id.canAuthTransition("idle", "registering"), true);
-  assert.equal(id.canAuthTransition("registering", "idle"), true);
-  assert.equal(id.canAuthTransition("registering", "confirming"), false);
-  assert.equal(id.canAuthTransition("verifying", "confirming"), true);
-  assert.equal(id.canAuthTransition("confirming", "cancelling"), true);
-  assert.equal(id.canAuthTransition("cancelling", "idle"), true);
-  assert.equal(id.canAuthTransition("idle", "confirming"), false);
+  assert.equal(phases.canAuthTransition("idle", "verifying"), true);
+  assert.equal(phases.canAuthTransition("idle", "registering"), true);
+  assert.equal(phases.canAuthTransition("registering", "idle"), true);
+  assert.equal(phases.canAuthTransition("registering", "confirming"), false);
+  assert.equal(phases.canAuthTransition("verifying", "confirming"), true);
+  assert.equal(phases.canAuthTransition("confirming", "cancelling"), true);
+  assert.equal(phases.canAuthTransition("cancelling", "idle"), true);
+  assert.equal(phases.canAuthTransition("idle", "confirming"), false);
 });
