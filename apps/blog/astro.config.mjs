@@ -23,7 +23,7 @@ export default defineConfig({
   trailingSlash: "ignore",
   integrations: [
     sitemap({
-      filter: (page) => !page.includes("/lab/") && !page.includes("/search/"),
+      filter: (page) => !page.includes("/lab/") && !page.includes("/search/") && !page.includes("/account/"),
     }),
   ],
   devToolbar: { enabled: false },
