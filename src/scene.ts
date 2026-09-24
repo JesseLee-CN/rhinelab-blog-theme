@@ -1136,12 +1136,12 @@ export class ArchiveScene {
     const chosen = this.cellPosition(this.selectedCell);
     const selectedRow = this.selectedCell.row;
     const selectedLane = this.selectedCell.lane;
-    damp(this.shoulder, selectedRow, this.motion.selectionTransition ? 35 : 5, dt);
-    damp(this.laneFocus, selectedLane, this.motion.selectionTransition ? 35 : 4, dt);
+    damp(this.shoulder, selectedRow, this.motion.selectionTransition ? 5 : 35, dt);
+    damp(this.laneFocus, selectedLane, this.motion.selectionTransition ? 4 : 35, dt);
     // A held or freely coasting plane owns both tracks; selection cannot pull it.
     if (!this.holdingArchive && !momentum) {
-      damp(this.columnCamera, chosen.x, this.motion.selectionTransition ? 35 : 3.7, dt);
-      damp(this.rail, cinematic ? 0 : -2.17 - chosen.z, this.motion.selectionTransition ? 35 : 3.7, dt);
+      damp(this.columnCamera, chosen.x, this.motion.selectionTransition ? 3.7 : 35, dt);
+      damp(this.rail, cinematic ? 0 : -2.17 - chosen.z, this.motion.selectionTransition ? 3.7 : 35, dt);
     }
     if (momentum) {
       this.columnCamera.value = this.trackPosition("lane", momentum.motion.lane.value);
@@ -1264,7 +1264,7 @@ export class ArchiveScene {
                 )
               ? 0
               : 0.4 * this.targetReveal,
-          this.motion.selectionTransition
+          !this.motion.selectionTransition
             ? 35
             : this.deferSelectionPulse &&
                 !this.targetDetail &&
@@ -1303,7 +1303,7 @@ export class ArchiveScene {
         o.lift.value = o.returnY - baseY;
         o.lift.velocity = 0;
         if (o.group.rotation.y === 0) o.returnY = null;
-      } else damp(o.lift, 0, this.motion.selectionTransition ? 35 : 4.5, dt);
+      } else damp(o.lift, 0, this.motion.selectionTransition ? 4.5 : 35, dt);
       o.group.position.set(
         p.x - trackX,
         baseY + o.lift.value + hoverLift(o.cell),
@@ -1312,7 +1312,7 @@ export class ArchiveScene {
       const quality = ease(o.lift.value / 0.4);
       this.appearance.apply(o.group, quality);
       this.appearance.setTheme(o.group, this.theme.sample(o.cell, time));
-      o.clarity = this.motion.detailTransition ? 0 : o.clarity * Math.exp(-dt * 9);
+      o.clarity = this.motion.detailTransition ? o.clarity * Math.exp(-dt * 9) : 0;
       this.appearance.setClarity(o.group, o.clarity);
       const { row, lane } = o.cell;
       o.group.rotation.x =
