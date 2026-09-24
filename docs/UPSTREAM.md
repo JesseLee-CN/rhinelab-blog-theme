@@ -10,8 +10,13 @@
 Copyright (c) 2026 LBEILC        ← 三维界面与相关程序代码
 ```
 
-完整许可见 [LICENSE](../LICENSE)。MIT **只**适用于仓库声明有权授权的程序代码、建模脚本与配套
-技术文档，**不自动覆盖**游戏名称、标志、设定、原作视觉、Blender / GLB 模型、图像、动图或原片短音。
+完整许可见 [LICENSE](../LICENSE)。上游作者对其创作且有权授权的**全部内容**统一采用 MIT，包括
+程序代码、建模脚本、技术文档、Blender 源工程、GLB 模型、原创配乐与音效，以及图像、动图和其他
+原创资源——非代码资产同样适用。
+
+**不覆盖**的只有第三方内容：《明日方舟》及莱茵生命相关名称、标志、设定、原 PV、原作视觉设计、
+原片音频采样及其衍生片段，以及各字体与依赖的既有许可（见 §4）。分发获授权内容时须保留版权声明
+与 MIT 许可证；所有内容按原样提供，不作担保。
 
 ## 2. 上游远端
 
@@ -94,6 +99,34 @@ git remote -v
 另外，本站裁剪掉了上游的 wallpaper / workbench 相关模块（本模板不分发这些实验功能），
 因此依赖它们的上游脚本也不移植。
 
+上游的动效验证文档（`MOTION-INTEGRATION.md` 等）作为开发过程记录不随模板分发；其中仍然有效的
+控制关系已整理进本节与 [../AGENTS.md](../AGENTS.md)，验证入口见 `npm run check:motion-preferences`。
+
+## 7.1 动效偏好（上游细粒度动效）
+
+上游把原来的单一「减少动态效果」开关细化为 14 个按键偏好（`src/motion-preferences.ts`）：
+开场、选档波浪、静止起伏、指针视差、拖拽动量、选档过渡、详情过渡、模型解密、正文揭示、
+文字滚动、数字滚动、表面过渡、查看器导航、查看器模型过渡。
+
+- 预设 `full` / `reduced` / `custom`：任一键被关闭即视为 `custom`；旧的 `reduced` 布尔设置会
+  自动迁移为逐键偏好。
+- 控制关系：`main.ts` 持有偏好并按 `motionActive(key)` 分发；`ArchiveScene.setMotion()` 接收
+  阵列相关键（指针视差、拖拽动量等）；`ModelViewer.setMotion()` 接收查看器相关键；
+  样式侧由 `#stage` 的 `reduce-motion` / `reduce-surfaces` 类驱动。
+- 本仓库的 `scene.ts` 是裁剪版：阵列侧目前把逐键偏好归并为一次「是否降低动效」判断
+  （`reduced` getter），逐键细分留作后续步骤；`setReduced()` 保留给开发对照页。
+
+## 7.2 尚未移植的上游改动
+
+以下上游改动已评估但**尚未落地**，需要按本仓库的裁剪版逐处适配：
+
+- src/main.ts：上游把设置面板的单一「减少动态效果」开关换成逐键偏好面板
+  （motionSettingsMarkup(prefs.motion, prefs.motionPreset)），并把各处 prefs.reduced 换成
+  motionActive(key)。本仓库的 main.ts 仍是单开关版本；因上游 main.ts 依赖 9 个本模板
+  已移除的模块（wallpaper、workbench、startup、rolling-clock 等），不能直接取用。
+- src/scene.ts：逐键细分（selectionTransition / detailTransition / idleWave / selectionWave /
+  surfaceTransitions / modelDecryption / pointerParallax）——目前归并为一次整体判断。
+
 ## 8. 同步锚点与记录
 
 | 项 | 值 |
@@ -107,4 +140,4 @@ git remote -v
 | --- | --- | --- | --- |
 | 2026-09-13 | `51ba3b0`、`65fc700`、`d9ecb6c` | 渲染复用（同帧阴影、共享实例矩阵与变化区间上传、静止画面复用、AO/景深共享深度）与模型精度对照页 | — |
 | 2026-09-13 | `8799b03` | 开场固定短语与角落品牌的描边图形；身份图形改用上游 `JOYCE MOORE` | 上游 MyFonts webfont 授权相关部分（本站不持有该授权） |
-| 2026-09-24 | `d9ecb6c..6185da2` | **待移植**：细粒度动效偏好（`src/motion-preferences.ts` 及 `main.ts`/`scene.ts`/`model-viewer.ts`/样式与过渡的接入）、动效偏好检查脚本、动效验证文档、许可范围调整 | Cloudflare Pages 部署（5 个提交）及其脚本与文档；依赖 wallpaper / workbench 的脚本 |
+| 2026-09-24 | `d9ecb6c..6185da2` | **部分采纳**：`src/motion-preferences.ts`（逐字节取上游）、`src/model-viewer.ts` 的 `setMotion()`、`src/style.css` 的动效样式、`src/scene.ts` 的 `setMotion()` 管道、`scripts/check-motion-preferences.mjs`、许可范围调整（MIT 覆盖原创素材） | Cloudflare Pages 部署（5 个提交）及其脚本与文档；依赖 wallpaper / workbench 的上游脚本；上游动效验证文档（属开发过程记录，已整理进 §7.1） |
