@@ -36,6 +36,7 @@ import { labelMarkSvg } from "./brand";
 import { archiveFraming } from "./viewport-layout";
 import { ArchiveDrag, ArchivePlaneMomentum, type DragAxis, type DragProjection, type DragPosition } from "./archive-drag";
 import { assetUrl as publicAsset } from "./asset-url";
+import { fullMotion, reducedMotion, type MotionPreferences } from "./motion-preferences";
 import {
   archiveWave,
   extraction,
@@ -138,7 +139,11 @@ export class ArchiveScene {
   private labelCanvas = document.createElement("canvas");
   private labelTexture?: THREE.CanvasTexture;
   private labelMark = new Image();
-  private reduced = false;
+  /** 细粒度动效偏好（上游同步）；`reduced` 是否生效由 getter 派生。 */
+  private motion: MotionPreferences = fullMotion();
+  private get reduced() {
+    return Object.values(this.motion).every((value) => !value);
+  }
   private quality = normalizeQuality(undefined);
   private appliedQuality = "";
   private smaa = new SMAAPass();
@@ -500,9 +505,28 @@ export class ArchiveScene {
       if (this.rotation !== 0) this.returnY = this.model.position.y;
     } else this.returnY = null;
   }
+  /**
+   * 细粒度动效接入（上游 d9ecb6c..6185da2）。
+   * 阵列侧目前归并为一次「是否降低动效」的判断：只要没有逐键偏好，就保持与旧的
+   * 布尔开关完全一致的行为；`setReduced()` 保留给开发对照页继续使用。
+   */
+  setMotion(value: MotionPreferences) {
+    if ((!value.pointerParallax || !value.dragMomentum) && (this.motion.pointerParallax || this.motion.dragMomentum)) {
+      this.cancelPointer();
+    }
+    const wasReduced = this.reduced;
+    this.motion = { ...value };
+    // 关掉队列移动/抽取/解密动效时，直接从当前状态落到终态。
+    if (this.reduced && !wasReduced) {
+      this.cancelPointer();
+      this.pulses = [];
+      this.idleGain = 0;
+      this.pointer.set(0, 0);
+    }
+  }
   setReduced(value: boolean) {
     if (value && !this.reduced) this.cancelPointer();
-    this.reduced = value;
+    this.setMotion(value ? reducedMotion() : fullMotion());
   }
   /**
    * Suspend or resume user input without touching the scene state. Used by the
