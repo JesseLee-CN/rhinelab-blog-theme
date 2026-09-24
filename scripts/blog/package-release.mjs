@@ -105,16 +105,25 @@ await mkdir(releaseDir, { recursive: true });
 execFileSync("tar", ["-czf", archive, "-C", dist, "."], { stdio: "inherit" });
 
 // 重定向 map 随 release 一起发布；由 activate 切换 active 指针后生效。
+// 缺 map 必须硬失败：全新克隆的 .generated/ 是空的，静默打包会发布一个不带重定向的 release，
+// 线上 WordPress 老链接（?p= / ?page_id=）随即全部 404。
 const redirectsDir = resolve(root, ".generated/redirects");
 const mapFiles = [];
+let mapNames = [];
 try {
-  for (const name of (await readdir(redirectsDir)).filter((n) => n.endsWith(".map")).sort()) {
-    await mkdir(resolve(releaseDir, "nginx"), { recursive: true });
-    await cp(resolve(redirectsDir, name), resolve(releaseDir, "nginx", name));
-    mapFiles.push(name);
-  }
+  mapNames = (await readdir(redirectsDir)).filter((name) => name.endsWith(".map")).sort();
 } catch {
-  console.warn("警告：未找到 .generated/redirects/*.map，先运行 npm run redirects。");
+  console.error(`缺少 ${redirectsDir}：release 必须带 nginx 重定向 map，请先运行 npm run redirects。`);
+  process.exit(1);
+}
+if (mapNames.length === 0) {
+  console.error(`缺少 ${redirectsDir}/*.map：release 必须带 nginx 重定向 map，请先运行 npm run redirects。`);
+  process.exit(1);
+}
+for (const name of mapNames) {
+  await mkdir(resolve(releaseDir, "nginx"), { recursive: true });
+  await cp(resolve(redirectsDir, name), resolve(releaseDir, "nginx", name));
+  mapFiles.push(name);
 }
 
 const archiveBuffer = await readFile(archive);
