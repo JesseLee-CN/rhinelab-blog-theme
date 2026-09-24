@@ -61,34 +61,20 @@ function ruleError(field: "username" | "password", error: string): string {
 
 function initHeader(): void {
   const link = document.querySelector<HTMLAnchorElement>("[data-account-link]");
-  const logout = document.querySelector<HTMLButtonElement>("[data-account-logout-inline]");
-  if (!link && !logout) return;
+  if (!link) return;
 
   const render = (session: AccountSession | null): void => {
     const user = session?.authenticated ? session.user : null;
-    if (link) {
-      link.textContent = user ? user.username : "登录";
-      // A signed-in reader gets their own page instead of the login form.
-      link.href = user ? "/account/" : "/account/?next=" + encodeURIComponent(location.pathname);
-      link.dataset.accountState = user ? "signed-in" : "signed-out";
-      if (user) link.title = `已登录：${user.username}`;
-    }
-    if (logout) logout.hidden = user === null;
+    link.textContent = user ? user.username : "登录";
+    // A signed-in reader gets their own page instead of the login form.
+    link.href = user ? "/account/" : "/account/?next=" + encodeURIComponent(location.pathname);
+    link.dataset.accountState = user ? "signed-in" : "signed-out";
+    if (user) link.title = `已登录：${user.username}`;
+    else link.removeAttribute("title");
   };
 
   bridge.subscribe(render);
   void bridge.read().then(render).catch(() => render(null));
-
-  logout?.addEventListener("click", () => {
-    logout.disabled = true;
-    void bridge
-      .logout()
-      .catch(() => {})
-      .finally(() => {
-        logout.disabled = false;
-        location.assign("/account/");
-      });
-  });
 }
 
 // --- account page ---------------------------------------------------------

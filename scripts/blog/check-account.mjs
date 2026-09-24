@@ -233,6 +233,32 @@ async function main() {
     await page.waitForSelector("[data-account-form]");
     record("账号页可访问且表单可见", await page.isVisible("[data-account-form]"));
 
+    // 登录模式只该有用户名与密码两格：`.account-field { display: block }` 会盖过
+    // 浏览器默认的 `[hidden] { display: none }`，所以这里必须按“可见性”判定而不是
+    // 看 hidden 属性，否则这个 bug 会一直躲过检查。
+    const loginMode = await page.evaluate(() => ({
+      confirmVisible: Boolean(document.querySelector("[data-account-confirm]")?.checkVisibility?.() ?? false),
+      submit: document.querySelector("[data-account-submit]")?.textContent?.trim(),
+    }));
+    record("登录模式不显示确认密码", loginMode.confirmVisible === false && loginMode.submit === "登录", loginMode);
+
+    await page.click("[data-account-mode='register']");
+    const registerMode = await page.evaluate(() => ({
+      confirmVisible: Boolean(document.querySelector("[data-account-confirm]")?.checkVisibility?.() ?? false),
+      required: document.querySelector("#account-confirm")?.required ?? null,
+      submit: document.querySelector("[data-account-submit]")?.textContent?.trim(),
+    }));
+    record(
+      "注册模式显示确认密码且为必填",
+      registerMode.confirmVisible === true && registerMode.required === true && registerMode.submit === "注册",
+      registerMode,
+    );
+    await page.click("[data-account-mode='login']");
+    record(
+      "切回登录后确认密码再次隐藏",
+      (await page.evaluate(() => Boolean(document.querySelector("[data-account-confirm]")?.checkVisibility?.() ?? false))) === false,
+    );
+
     await page.fill("#account-username", ACCOUNT.username);
     await page.fill("#account-password", ACCOUNT.password);
     await page.click("[data-account-submit]");

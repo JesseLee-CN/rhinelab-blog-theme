@@ -24,6 +24,14 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* `hidden` 是浏览器默认的 `display: none`，但任何组件类里的 display 都会盖过它
+   （例如 `.account-field { display: block }` 会让「确认密码」在登录模式下也显示）。
+   lab 的登录面板在 panel.css 里逐个可隐藏行写了 [hidden] 规则；博客侧统一兜底一次，
+   避免每加一个可隐藏字段就踩同一个坑。 */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--paper);
