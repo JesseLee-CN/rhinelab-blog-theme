@@ -141,8 +141,9 @@ export class ArchiveScene {
   private labelMark = new Image();
   /** 细粒度动效偏好（上游同步）；`reduced` 是否生效由 getter 派生。 */
   private motion: MotionPreferences = fullMotion();
+  /** 阵列侧继承上游语义：轨道移动由 selectionTransition 决定。 */
   private get reduced() {
-    return Object.values(this.motion).every((value) => !value);
+    return !this.motion.selectionTransition;
   }
   private quality = normalizeQuality(undefined);
   private appliedQuality = "";
@@ -516,7 +517,7 @@ export class ArchiveScene {
     }
     const wasReduced = this.reduced;
     this.motion = { ...value };
-    // 关掉队列移动/抽取/解密动效时，直接从当前状态落到终态。
+    // 关掉轨道移动（selectionTransition）后，阵列直接从当前状态落到终态。
     if (this.reduced && !wasReduced) {
       this.cancelPointer();
       this.pulses = [];
@@ -1000,7 +1001,7 @@ export class ArchiveScene {
       if (!cancelled && browse && this.canBrowse()) {
         moveArchive(e);
         if (this.archiveDrag.active) {
-          if (!this.reduced) {
+          if (this.motion.dragMomentum) {
             this.archiveMomentum = {
               time: performance.now() / 1000,
               motion: new ArchivePlaneMomentum(
@@ -1096,13 +1097,13 @@ export class ArchiveScene {
     if (!this.loaded) return;
     this.theme.beginFrame();
     themeEnvironment(this.scene, this.renderer, this.themeAmount);
-    const blend = 1 - Math.exp(-dt * (this.reduced ? 35 : 2.8));
+    const blend = 1 - Math.exp(-dt * (this.motion.selectionTransition ? 2.8 : 35));
     this.reveal = cinematic
       ? cinematic.reveal
       : THREE.MathUtils.lerp(this.reveal, this.targetReveal, blend);
     this.rotation = this.targetDetail
       ? THREE.MathUtils.lerp(this.rotation, this.targetRotation, blend)
-      : returnStep(this.rotation, dt, this.reduced);
+      : returnStep(this.rotation, dt, !this.motion.detailTransition);
     const shot = cinematic?.time ?? 29.1;
     if (cinematic) {
       this.scanTime = shot;
@@ -1127,7 +1128,7 @@ export class ArchiveScene {
     if (hoverKey && !this.hoverLifts.has(hoverKey)) this.hoverLifts.set(hoverKey, 0);
     for (const [key, value] of this.hoverLifts) {
       const target = key === hoverKey ? 0.28 : 0;
-      const next = cinematic ? 0 : this.reduced ? target : THREE.MathUtils.lerp(value, target, 1 - Math.exp(-dt * 14));
+      const next = cinematic ? 0 : !this.motion.selectionTransition ? target : THREE.MathUtils.lerp(value, target, 1 - Math.exp(-dt * 14));
       if (target === 0 && next < 0.0001) this.hoverLifts.delete(key);
       else this.hoverLifts.set(key, next);
     }
@@ -1135,12 +1136,12 @@ export class ArchiveScene {
     const chosen = this.cellPosition(this.selectedCell);
     const selectedRow = this.selectedCell.row;
     const selectedLane = this.selectedCell.lane;
-    damp(this.shoulder, selectedRow, this.reduced ? 35 : 5, dt);
-    damp(this.laneFocus, selectedLane, this.reduced ? 35 : 4, dt);
+    damp(this.shoulder, selectedRow, this.motion.selectionTransition ? 35 : 5, dt);
+    damp(this.laneFocus, selectedLane, this.motion.selectionTransition ? 35 : 4, dt);
     // A held or freely coasting plane owns both tracks; selection cannot pull it.
     if (!this.holdingArchive && !momentum) {
-      damp(this.columnCamera, chosen.x, this.reduced ? 35 : 3.7, dt);
-      damp(this.rail, cinematic ? 0 : -2.17 - chosen.z, this.reduced ? 35 : 3.7, dt);
+      damp(this.columnCamera, chosen.x, this.motion.selectionTransition ? 35 : 3.7, dt);
+      damp(this.rail, cinematic ? 0 : -2.17 - chosen.z, this.motion.selectionTransition ? 35 : 3.7, dt);
     }
     if (momentum) {
       this.columnCamera.value = this.trackPosition("lane", momentum.motion.lane.value);
@@ -1185,7 +1186,7 @@ export class ArchiveScene {
     const aligningCopy = this.outgoing.some((o) => o.returnY !== null);
     const idle =
       !cinematic &&
-      !this.reduced &&
+      this.motion.idleWave &&
       this.targetReveal > 0 &&
       !this.targetDetail &&
       this.detail < 0.01 &&
@@ -1226,7 +1227,7 @@ export class ArchiveScene {
           time,
         ) *
           this.idleGain;
-      if (!cinematic && !this.reduced) {
+      if (!cinematic && this.motion.selectionWave) {
         let ripple = 0;
         for (const p of this.pulses) {
           const distance = Math.hypot(row - p.row, (lane - p.lane) * 2.2);
@@ -1263,7 +1264,7 @@ export class ArchiveScene {
                 )
               ? 0
               : 0.4 * this.targetReveal,
-          this.reduced
+          this.motion.selectionTransition
             ? 35
             : this.deferSelectionPulse &&
                 !this.targetDetail &&
@@ -1283,7 +1284,7 @@ export class ArchiveScene {
       ? cinematic.zoom
       : THREE.MathUtils.lerp(this.detail, cameraTarget, blend);
     const detail = this.detail;
-    this.decryption.update(dt, detail > .78 && this.lift.value > 3.3, this.reduced,
+    this.decryption.update(dt, detail > .78 && this.lift.value > 3.3, !this.motion.modelDecryption,
       cinematic ? shot + 5 : undefined);
     this.appearance.apply(this.model, ease(this.lift.value / 0.4));
     this.appearance.setClarity(this.model, this.decryption.clarity);
@@ -1297,12 +1298,12 @@ export class ArchiveScene {
       const o = this.outgoing[i];
       const p = this.cellPosition(o.cell);
       const baseY = p.y + field(o.cell.row, o.cell.lane);
-      o.group.rotation.y = returnStep(o.group.rotation.y, dt, this.reduced);
+      o.group.rotation.y = returnStep(o.group.rotation.y, dt, !this.motion.detailTransition);
       if (o.returnY !== null) {
         o.lift.value = o.returnY - baseY;
         o.lift.velocity = 0;
         if (o.group.rotation.y === 0) o.returnY = null;
-      } else damp(o.lift, 0, this.reduced ? 35 : 4.5, dt);
+      } else damp(o.lift, 0, this.motion.selectionTransition ? 35 : 4.5, dt);
       o.group.position.set(
         p.x - trackX,
         baseY + o.lift.value + hoverLift(o.cell),
@@ -1311,7 +1312,7 @@ export class ArchiveScene {
       const quality = ease(o.lift.value / 0.4);
       this.appearance.apply(o.group, quality);
       this.appearance.setTheme(o.group, this.theme.sample(o.cell, time));
-      o.clarity = this.reduced ? 0 : o.clarity * Math.exp(-dt * 9);
+      o.clarity = this.motion.detailTransition ? 0 : o.clarity * Math.exp(-dt * 9);
       this.appearance.setClarity(o.group, o.clarity);
       const { row, lane } = o.cell;
       o.group.rotation.x =
@@ -1341,7 +1342,7 @@ export class ArchiveScene {
       // The new file causes the wave: finish most of its rise and let nearby
       // outgoing files get below it before starting the outward pulse.
       if (this.lift.value >= 0.35 && this.returnY === null && oldCardsLower) {
-        if (!this.reduced) this.emitPulse(this.pendingPulse);
+        if (this.motion.selectionWave) this.emitPulse(this.pendingPulse);
         this.pendingPulse = null;
       }
     }
@@ -1531,7 +1532,7 @@ export class ArchiveScene {
     const cameraPosition = cameraAim
       .clone()
       .addScaledVector(viewDirection, distance);
-    if (!cinematic && !this.reduced) {
+    if (!cinematic && this.motion.pointerParallax) {
       cameraPosition.x += this.pointer.x * 0.12;
       cameraPosition.y -= this.pointer.y * 0.12;
     }
