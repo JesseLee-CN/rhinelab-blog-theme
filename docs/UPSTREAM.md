@@ -143,8 +143,8 @@ git remote -v
 
 | 项 | 值 |
 | --- | --- |
-| 最近已同步的上游提交 | `d9ecb6c`（渲染复用与模型精度），其后补入 `8799b03`（开场排版） |
-| 已评估的上游范围 | `d9ecb6c..6185da2`（17 个提交、34 个文件） |
+| 最近已同步的上游提交 | `6185da2`（细粒度动效与许可范围调整） |
+| 已评估的上游范围 | `d9ecb6c..6185da2`（17 个提交、34 个文件），动效部分已全部落地 |
 
 **同步记录**
 
@@ -152,4 +152,4 @@ git remote -v
 | --- | --- | --- | --- |
 | 2026-09-13 | `51ba3b0`、`65fc700`、`d9ecb6c` | 渲染复用（同帧阴影、共享实例矩阵与变化区间上传、静止画面复用、AO/景深共享深度）与模型精度对照页 | — |
 | 2026-09-13 | `8799b03` | 开场固定短语与角落品牌的描边图形；身份图形改用上游 `JOYCE MOORE` | 上游 MyFonts webfont 授权相关部分（本站不持有该授权） |
-| 2026-09-24 | `d9ecb6c..6185da2` | **部分采纳**：`src/motion-preferences.ts`（逐字节取上游）、`src/model-viewer.ts` 的 `setMotion()`、`src/style.css` 的动效样式、`src/scene.ts` 的 `setMotion()` 管道、`scripts/check-motion-preferences.mjs`、许可范围调整（MIT 覆盖原创素材） | Cloudflare Pages 部署（5 个提交）及其脚本与文档；依赖 wallpaper / workbench 的上游脚本；上游动效验证文档（属开发过程记录，已整理进 §7.1） |
+| 2026-09-24 | `d9ecb6c..6185da2` | **已全量采纳**：`src/motion-preferences.ts`（逐字节取上游）、`main.ts` 逐键面板与 32 处 `motionActive(key)`、`scene.ts` 阵列侧逐键接入、`model-viewer.ts` 的 `setMotion()`、`style.css` 动效样式、`scripts/check-motion-preferences.mjs`、许可范围调整（MIT 覆盖原创素材）。**已按流程同步到私有仓库并发布上线** | Cloudflare Pages 部署（5 个提交）及其脚本与文档；依赖 wallpaper / workbench 的上游脚本；上游动效验证文档（属开发过程记录，已整理进 §7.1） |
