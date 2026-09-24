@@ -13,6 +13,7 @@
  *   - `all` = content + interaction + failure. `compat` and `performance` must be
  *     named explicitly: their numbers are judged in IR6, not here.
  */
+import { readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
@@ -99,8 +100,35 @@ const baseUrl = target.baseUrl;
 // ---------------------------------------------------------------------------
 const lab = await loadLabContent();
 const published = await loadPublished();
+/**
+ * A search term that really exists in the post the pagefind case asserts on.
+ *
+ * Derived from the built article instead of hardcoded: the sample articles are
+ * meant to be replaced, and a stale term turns the whole search case red without
+ * anything being wrong with the index. Latin tokens are preferred because the
+ * previous positive control ("Multisim") proved they are indexed verbatim.
+ */
+function positiveSearchTerm(entry) {
+  const file = resolve(root, "dist", entry.path.replace(/^\//, ""), "index.html");
+  const html = readFileSync(file, "utf8");
+  const article = /<div class="prose"[^>]*>([\s\S]*?)<\/div>\s*<\/article>/.exec(html)?.[1] ?? html;
+  const text = article.replace(/<[^>]+>/g, " ").replace(/&[a-z]+;/gi, " ");
+  const counts = new Map();
+  for (const token of text.match(/[A-Za-z][A-Za-z0-9-]{4,}/g) ?? []) counts.set(token, (counts.get(token) ?? 0) + 1);
+  const ranked = [...counts].sort((a, b) => b[1] - a[1] || b[0].length - a[0].length || a[0].localeCompare(b[0]));
+  if (ranked.length) return ranked[0][0];
+  const cjk = /[\u4e00-\u9fff]{4,}/.exec(text);
+  return cjk ? cjk[0].slice(0, 6) : null;
+}
+
+const pagefindPost = published.posts.find((entry) => entry.id === "wp-55") ?? published.posts[0];
+const pagefindPositive = pagefindPost ? positiveSearchTerm(pagefindPost) : null;
+if (!pagefindPositive) {
+  console.error("无法从已构建的文章中取得 Pagefind 正向检索词；请先 npm run build 生成 dist/。");
+  process.exit(2);
+}
 const pagefindTerms = {
-  positive: "Multisim",
+  positive: pagefindPositive,
   negative: [...FIXTURE_SENTINELS, ...published.hidden.map((entry) => entry.id)],
 };
 let fixture = { built: false };

@@ -6,15 +6,38 @@
 
 ## 1. 模块与职责
 
+阅读层是一个自包含的功能模块 `src/features/reader/`（模块约定见 [FEATURES.md](FEATURES.md)）：
+
 | 文件 | 职责 |
 | --- | --- |
-| `src/article-reader.ts` | 阅读层生命周期：打开/关闭事务、焦点与 inert 所有权、滚动记录、错误与重试 |
-| `src/article-reader-content.ts` | 内容加载：fetch 约定、超时与体积上限、错误码归因 |
-| `src/article-reader-toc.ts` | 目录导航：只用正文已有标题 id，不解析 Markdown、不生成新锚点 |
-| `src/article-reader.css` | 窗口/工具栏/阅读区/目录导航的布局与主题 |
-| `src/article-reader-markdown.css` | 正文 markdown 呈现（只作用于 `.article-reader .reader-content`） |
+| `src/features/reader/index.ts` | **唯一对外入口**：`ReaderHost`（需要核心提供什么）与 `createReaderFeature()` 门面；懒加载、请求令牌、守卫、焦点恢复、pagehide 与 HMR 清理 |
+| `src/features/reader/reader.ts` | 阅读层生命周期：打开/关闭事务、焦点与 inert 所有权、滚动记录、错误与重试 |
+| `src/features/reader/loader.ts` | 内容加载：fetch 约定、超时与体积上限、错误码归因 |
+| `src/features/reader/toc.ts` | 目录导航：只用正文已有标题 id，不解析 Markdown、不生成新锚点 |
+| `src/features/reader/reader.css` | 窗口/工具栏/阅读区/目录导航的布局与主题 |
+| `src/features/reader/markdown.css` | 正文 markdown 呈现（只作用于 `.article-reader .reader-content`） |
+| `src/features/reader/styles.ts` | 样式懒加载入口：两份 CSS 随本模块的 chunk 一起加载，不进三维入口首屏 |
 
-对外接口（`src/article-reader.ts`）：
+核心只通过门面使用阅读层，不接触 `ImmersiveReader`：
+
+```ts
+interface ReaderFeature {
+  isActive(): boolean;
+  ownsEvent(event: Event): boolean;      // 事件是否属于阅读层表面
+  open(link: HTMLAnchorElement): Promise<void>;
+  closeIfActive(): void;
+  closeForContextChange(): Promise<void>;
+  withClosed<T>(action: () => T | Promise<T>): Promise<T>;
+  release(): void;                       // pagehide / bfcache
+  snapshot(): ReaderReviewSnapshot;      // DEV 审阅
+  dispose(): void;
+}
+```
+
+门面反过来只通过 `ReaderHost` 借用核心能力（当前选中档案、就绪状态、身份门、
+场景模式、提示条、音效、冻结三维输入），因此移除本模块不会牵动三维核心。
+
+阅读层内部接口（`src/features/reader/reader.ts`）：
 
 ```ts
 type ReaderTarget = Readonly<{ postId: string; href: string; title: string }>;
@@ -31,7 +54,7 @@ interface ImmersiveReader {
 }
 ```
 
-阅读模块按需 `import()`，因此 **parse5 不进入 `/lab/` 的初始包**。
+阅读模块按需 `import()`，因此 **parse5 与阅读层 CSS 都不进入 `/lab/` 的初始包**。
 
 ## 2. 页面契约
 
@@ -131,7 +154,11 @@ interface ImmersiveReader {
 ## 8. 与其他模块的边界
 
 - 背景三维场景**继续更新，只暂停输入**：未完成的镜头阻尼、自然动效与解密照常到终态。
-- 阅读层不直接调用 `setMode()`；由主应用负责「先关阅读层、再执行动作」的编排。
+  冻结输入只能走宿主端口 `ReaderHost.setSceneInputSuspended`，阅读层不直接命令场景。
+- 阅读层不直接调用 `setMode()`；由主应用负责「先关阅读层、再执行动作」的编排，
+  阅读层只提供 `withClosed()` / `closeForContextChange()` 两个等待型入口。
+- 阅读层不读核心的模块级状态（当前选中档案、就绪标志、身份门、场景模式），
+  全部经 `ReaderHost` 查询；因此核心的变量改名不会影响本模块。
 - 模态锁按所有权恢复：不把 `stage.inert` 无条件写回 `false`。
 - 主题读取 lab 的 `--theme-*` 变量（含浅色回退），不假设系统主题与用户选择一致；
   不整包导入 `blog.css`（其 `:root`/`body`/`a` 等全局规则会污染三维应用）。
@@ -143,14 +170,33 @@ npm run test:reader          # 契约 / 加载器 / 面板单元测试
 npm run test:reader-e2e      # 端到端总门（Playwright；--browser/--suite/--out-dir）
 npm run check:reader         # 构建后 dist 的 reader 契约与夹具哨兵检查
 npm run check:reader-content # 阅读内容与契约的独立校验
+npm run check:features       # 模块边界：入口唯一、无跨功能穿透、无孤儿文件
 npm run build:reader-fixtures
 ```
 
 改动 reader 时至少覆盖：契约字段与版本、白名单拒绝项、超时与体积上限、错误码归因、
 目录跳转与收起、Esc 与焦点恢复、减少动态效果、以及「背景仍在更新但输入被暂停」。
 
+### 9.1 端到端期望必须从内容派生
+
+`test:reader-e2e` 的期望值**不得写死具体文章的词句或长度**。模板的示例文章会被替换，
+写死之后轻则必然失败、重则静默变成永远通过的空检查（旧版本就有这个问题：正向检索词固定为
+私有仓库文章的 `Multisim`，正文哨兵固定为 `参考资料`，长度阈值固定为 `textLength > 4000`，
+滚动恢复容差固定为距文末 400px——换成示例文章后 5 个场景长期为红）。现行做法：
+
+| 断言 | 期望值来源 |
+| --- | --- |
+| Pagefind 正向检索 | 从被断言文章**已构建的正文**中派生出现频最高的拉丁词（无拉丁词时取中文串） |
+| 「初始 chunk 不含文章正文」 | 探针取自被服务文章正文的末 30 字，而不是某一句话 |
+| 「reader 渲染出整篇正文」 | 与被服务页面的 `.prose` 文本长度比较（≥80%），不设绝对字符数 |
+| 滚动恢复 | 按契约 §7 的锚点公式（`anchorTop − anchorOffset`，clamp 到可达范围）与实际记录比对 |
+
+滚动恢复尤其不能按「距文末多少像素」判定：文末之后仍有内容时，最后一个锚点本就落在可达滚动
+范围之外，长短文章都会如此。
+
 ## 10. 相关文档
 
 - [docs/README.md](README.md)：文档索引
+- [FEATURES.md](FEATURES.md)：功能模块划分与增删流程
 - [BUILD.md](BUILD.md)：构建与发布
 - [../DESIGN.md](../DESIGN.md)：三维视觉与行为基线

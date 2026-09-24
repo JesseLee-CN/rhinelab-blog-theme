@@ -9,7 +9,7 @@ Rhine Lab 启动身份认证服务（G2 存储/密码/CLI，G3 HTTP 协议与安
 ```text
 cmd/lab-auth/          CLI 与服务入口（serve）
 internal/config/       环境配置加载与校验
-internal/identity/     用户名/密码规则（与 src/boot-identity.ts 对齐）
+internal/identity/     用户名/密码规则（与 src/features/auth/identity.ts 对齐）
 internal/password/     Argon2id PHC 散列与校验
 internal/ratelimit/    有界定窗限流器（内存，重启重置）
 internal/server/       /lab/api/auth/ HTTP 处理、Cookie、CSRF、日志

@@ -72,6 +72,24 @@ export const pathMatcher = (canonicalPath) => (url) => {
   }
 };
 
+/**
+ * The served article's own prose length, measured the way the reader sees it.
+ *
+ * Content-derived on purpose: the template ships short sample articles, so an
+ * absolute "long enough" threshold would fail here while a real blog's articles
+ * pass it. Comparing against the served page keeps the claim meaningful at any
+ * content length — the reader must render essentially the whole article.
+ */
+export async function articleProseLength(page, href) {
+  return page.evaluate(async (target) => {
+    const response = await fetch(target, { credentials: "omit" });
+    if (!response.ok) return null;
+    const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+    const prose = doc.querySelector(".prose");
+    return prose ? prose.textContent.replace(/\s+/g, "").length : null;
+  }, href);
+}
+
 /** Reader state, including the live sheet transform used for motion evidence. */
 export const readerSnapshot = () => {
   const dialog = document.querySelector("dialog.article-reader");

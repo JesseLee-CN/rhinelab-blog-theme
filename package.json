@@ -13,6 +13,7 @@
     "dev:reference": "npm run generate:lab-content && vite --host 127.0.0.1",
     "dev": "npm run generate:lab-content && vite --config vite.lab.config.ts --host 127.0.0.1",
     "check:content": "node scripts/blog/check-content.mjs",
+    "check:features": "node scripts/check-features.mjs",
     "check:viewport": "node --experimental-strip-types scripts/check-viewport.mjs",
     "check:reader": "node --experimental-strip-types scripts/blog/check-reader.mjs",
     "test:reader": "node --experimental-strip-types --test scripts/reading/test-contract.mjs scripts/reading/test-controller.mjs scripts/reading/test-surface.mjs",

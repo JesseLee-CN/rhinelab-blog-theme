@@ -1,6 +1,6 @@
 {
   "generatedBy": "scripts/auth/gen-identity-fixtures.mjs",
-  "contract": "src/boot-identity.ts",
+  "contract": "src/features/auth/identity.ts",
   "username": [
     {
       "value": "ab",

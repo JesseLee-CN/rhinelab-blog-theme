@@ -1,4 +1,4 @@
-// G1 contract tests for the pure identity rules in src/boot-identity.ts.
+// G1 contract tests for the pure identity rules in src/features/auth/identity.ts.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { dirname, resolve } from "node:path";
@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { loadTs } from "./load-ts.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const id = loadTs(resolve(here, "../../src/boot-identity.ts"));
+const id = loadTs(resolve(here, "../../src/features/auth/identity.ts"));
 
 test("usernameKey lowercases and usernameLabel uppercases", () => {
   assert.equal(id.usernameKey("Joyce-Moore"), "joyce-moore");

@@ -1,5 +1,5 @@
 /**
- * IR2 async/request gate for `src/article-reader-content.ts`.
+ * IR2 async/request gate for `src/features/reader/loader.ts`.
  *
  * Covers the request contract (one GET, cache/credentials/redirect mode), every
  * error code, the byte ceiling with stream cancellation, timeout driven by an
@@ -12,7 +12,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { loadArticleContent, DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT_MS } from "../../src/article-reader-content.ts";
+import { loadArticleContent, DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT_MS } from "../../src/features/reader/loader.ts";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const logDir = resolve(root, ".tools/immerse-reading/IR2/logs");

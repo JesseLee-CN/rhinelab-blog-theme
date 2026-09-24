@@ -10,6 +10,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
+| [FEATURES.md](FEATURES.md) | 功能模块划分：相对上游新增功能的清单、宿主端口与门面、边界规则、增删一个功能的完整流程 |
 | [AUTHORING.md](AUTHORING.md) | 写作与内容维护：目录约定、frontmatter 字段、草稿与未来文章、URL 与重定向、三维主题映射、常见问题 |
 | [BUILD.md](BUILD.md) | 构建与发布：环境准备、构建顺序、本地预览、资源白名单、release 打包与激活、回滚、健康检查、排障 |
 | [READER.md](READER.md) | 沉浸式全文阅读：模块职责、页面契约、窗口与布局参数、控件与目录导航、内容白名单与安全、滚动恢复、验证命令 |
@@ -23,6 +24,7 @@
 
 - **要写文章**：[AUTHORING.md](AUTHORING.md) → [content/README.md](../content/README.md)
 - **要部署上线**：[BUILD.md](BUILD.md) → [BLOG-MAINTAIN-PERFECT.md](../BLOG-MAINTAIN-PERFECT.md)
-- **要改阅读层**：[READER.md](READER.md) → `src/article-reader*.ts` 与 `scripts/reading/`
-- **要改登录/注册**：[IDENTITY.md](IDENTITY.md) → `services/lab-auth/openapi.yaml`
+- **要增删功能模块**：[FEATURES.md](FEATURES.md) → [src/features/README.md](../src/features/README.md)
+- **要改阅读层**：[READER.md](READER.md) → `src/features/reader/` 与 `scripts/reading/`
+- **要改登录/注册**：[IDENTITY.md](IDENTITY.md) → `src/features/auth/` 与 `services/lab-auth/openapi.yaml`
 - **要同步上游或调整素材**：[UPSTREAM.md](UPSTREAM.md)

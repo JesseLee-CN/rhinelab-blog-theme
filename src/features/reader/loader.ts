@@ -7,8 +7,8 @@
  * Errors are reported as codes only - response bodies never reach the reader,
  * the console or a log.
  */
-import { convertArticleHtml, type ConvertResult, type ReaderDom } from "../shared/reading/content.ts";
-import { checkArticleUrl, describeUrlProblem } from "../shared/reading/url-policy.ts";
+import { convertArticleHtml, type ConvertResult, type ReaderDom } from "../../../shared/reading/content.ts";
+import { checkArticleUrl, describeUrlProblem } from "../../../shared/reading/url-policy.ts";
 
 export type LoadErrorCode = "network" | "timeout" | "http" | "content-type" | "too-large" | "contract" | "unsupported";
 

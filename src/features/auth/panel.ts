@@ -10,8 +10,8 @@ import {
   type ChosenIdentity,
   type EntryPanelPhase,
   type UsernameError,
-} from "./boot-identity";
-import { AuthError, type IdentityPort, type PublicUser } from "./auth-client";
+} from "./identity";
+import { AuthError, type IdentityPort, type PublicUser } from "./client";
 
 export interface BootEntryOptions {
   mount: HTMLElement;

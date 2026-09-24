@@ -24,9 +24,10 @@ npm run dev:lab         # 三维入口开发（地址以终端输出为准）
 
 ```bash
 npm run check:content   # 内容 schema、路径、草稿、封面与主题引用
+npm run check:features  # 功能模块边界（入口唯一、无跨功能穿透、无孤儿文件）
 npm run test:blog       # 内容契约单元测试
 npm run typecheck       # 三维 TypeScript 检查
-npm run build           # 校验 → Astro → /lab/ → Pagefind → 整站检查
+npm run build           # 校验 → 功能边界 → Astro → /lab/ → Pagefind → 整站检查
 npm run preview         # 静态 dist/ 预览，未知路径返回真实 404
 ```
 
@@ -37,17 +38,20 @@ npm run preview         # 静态 dist/ 预览，未知路径返回真实 404
 | `content/posts/`、`content/pages/` | 正文唯一来源（Markdown） |
 | `content/lab-collections.json` | 三维档案的五个策展主题，引用稳定文章 ID |
 | `apps/blog/` | Astro 子应用：页面、布局、样式与内容契约 |
-| `src/`、`lab/`、`shared/` | 三维应用与 `/lab/` 入口 |
+| `src/`、`lab/` | 三维应用（上游代码）与 `/lab/` 入口 |
+| `src/features/<id>/` | 本站自有功能模块：启动身份门与登录（`auth`）、沉浸式阅读（`reader`） |
+| `shared/` | 博客与三维入口共用的库：阅读层纯逻辑、字体 CSS |
 | `scripts/blog/` | 内容校验、摘要生成、构建编排、打包与预览 |
 | `ops/` | 参数化部署、nginx 配置、systemd unit、回滚与 smoke 工具 |
 | `services/lab-auth/` | 启动身份认证服务（Go + SQLite） |
 | `art/`、`reference/` | Blender 工程与可复现脚本、开发对照工具 |
-| `docs/` | 说明性文档：写作、构建与发布、阅读层、身份与认证、上游与许可 |
+| `docs/` | 说明性文档：写作、构建与发布、功能模块、阅读层、身份与认证、上游与许可 |
 
 ## 文档
 
 | 文档 | 内容 |
 | --- | --- |
+| [docs/FEATURES.md](docs/FEATURES.md) | 功能模块划分：新增功能清单、宿主端口与门面、边界规则、增删流程 |
 | [docs/AUTHORING.md](docs/AUTHORING.md) | 写作与内容维护：frontmatter、草稿与未来文章、URL 与重定向、三维主题映射 |
 | [docs/BUILD.md](docs/BUILD.md) | 构建与发布：构建顺序、本地预览、资源白名单、release 打包与激活、回滚、排障 |
 | [docs/READER.md](docs/READER.md) | 沉浸式阅读：窗口与布局参数、控件与目录导航、内容白名单、滚动恢复 |

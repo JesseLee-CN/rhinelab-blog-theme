@@ -33,7 +33,7 @@ python scripts/make-boot-lettering.py --fonts .tools/boot-lettering-src/extract 
   - 本站改动 ②：`setText(value, exactText?)` —— 身份行会逐字显示动态注册名，多个短语共享 `ID CONFIRMED : ` 前缀时无法只靠前缀判断目标；调用方传入完整目标文案即可精确选段，传入值与目标不构成前缀关系时自动退回上游行为。
 - `src/boot-lettering.css`：图形单元格以 `em` 计宽，随既有字号与响应式规则缩放；`.brand h1` 改为 50.75px / 1px 字距 / 48px 高，下方两行不受影响。
 - `src/boot.ts`：在收集完扫描圆环路径之后再绑定 lettering（图形自身含 SVG path，不能混入圆环几何）；`update()` 中 ACCESS 与身份/请求/处理提示改走 `setText()`。
-- `src/boot-intro.ts`：登录序幕的 `.brand.intro-brand` 与 `#stage` 的品牌共用 `brandHeading`，**同样绑定 `["brand"]` 图形**。该字块是 `width: auto`（内容撑开），只改 CSS 而不绑图形会让序幕那份变成 50.75px 的普通文字、明显偏宽（2026-09-13 用户反馈「图一未居中对齐」）；绑定后两份都是同一图形，宽度 271.02px、`OS` 贴右，与档案页一致。
+- `src/features/auth/intro.ts`：登录序幕的 `.brand.intro-brand` 与 `#stage` 的品牌共用 `brandHeading`，**同样绑定 `["brand"]` 图形**。该字块是 `width: auto`（内容撑开），只改 CSS 而不绑图形会让序幕那份变成 50.75px 的普通文字、明显偏宽（2026-09-13 用户反馈「图一未居中对齐」）；绑定后两份都是同一图形，宽度 271.02px、`OS` 贴右，与档案页一致。
 - `src/main.ts`：启动准备阶段并行调用 `loadBootWebfonts()`；本站 `__RHINE_NOVECENTO__` 恒为 false，因此始终使用图形。
 - `vite.lab.config.ts`：显式 `define` `__RHINE_NOVECENTO__ = false`。
 

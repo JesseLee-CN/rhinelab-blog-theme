@@ -68,7 +68,12 @@ TypeScript / Three.js 三维界面作为独立的 `/lab/` 入口。
 - `apps/blog/`：Astro 子应用；根 npm workspace 与统一 lockfile 管理依赖。
 - `content/posts/`、`content/pages/`：Markdown 正文；`content/lab-collections.json`：主题与文章 ID 引用。
 - `scripts/blog/`：内容校验、摘要生成、构建编排、打包与预览。
+- `src/features/<id>/`：**本站自有功能模块**（上游没有的登录/身份门、沉浸式阅读等），每个目录一个自包含
+  单元，只通过 `index.ts` 对外暴露「宿主端口 + 门面」。上游自带文件保持原路径不动，因此上游同步仍是
+  逐文件内容级移植。功能清单在 `features.manifest.json`，边界由 `npm run check:features` 校验；
+  约定与增删流程见 [docs/FEATURES.md](docs/FEATURES.md) 与 [src/features/README.md](src/features/README.md)。
 - `ops/`：参数化部署、Web 配置、回滚与 smoke 工具；`services/lab-auth/`：认证服务源码。
+- `shared/`：博客构建与三维入口共用的库（阅读层纯逻辑、字体 CSS）；不放只服务单一功能的代码。
 - `art/`、`reference/`、`verification/`：模型工程、开发对照与验证入口。
 - `.generated/`、`dist/`、`release/` 与构建产物不作为正文来源，且不进 Git。
 
@@ -86,7 +91,7 @@ TypeScript / Three.js 三维界面作为独立的 `/lab/` 入口。
 ## 6. 三维与阅读层边界
 
 保留现有原生实现与已验证的视觉基线，具体参数以 [DESIGN.md](DESIGN.md) 与
-`src/article-reader*.ts` 的实现为准。
+`src/features/reader/` 的实现为准。
 
 - 卡片抽取保持竖直升降，靠近/转向由镜头完成；不要横向移动卡片或压低背景阵列来“修复”构图。
 - 快速切换保留当前位置与运动状态；不擅自恢复上游已撤回的光影、波浪或内构实验。
@@ -102,12 +107,13 @@ TypeScript / Three.js 三维界面作为独立的 `/lab/` 入口。
 ```bash
 npm ci --ignore-scripts
 npm run check:content          # 内容 schema、路径、草稿、封面、主题引用
+npm run check:features         # 功能模块边界：入口唯一、无跨功能穿透、无孤儿文件
 npm run test:blog              # 内容契约单元测试
 npm run typecheck              # 三维 TypeScript 检查
 npm run test:reader            # 沉浸式阅读契约/加载器/面板单元测试
 npm run test:reader-e2e        # 阅读层总门（Playwright）
 npm run check:site             # 构建后产物、泄露与 lab 边界检查
-npm run build                  # 校验 → Astro → lab → Pagefind → 站点检查
+npm run build                  # 校验 → 功能边界 → Astro → lab → Pagefind → 站点检查
 npm run preview                # 静态 dist/ 预览，未知路径真实 404
 node ops/smoke-test.mjs <url>  # 线上/候选 smoke 检查
 ```
@@ -117,6 +123,7 @@ node ops/smoke-test.mjs <url>  # 线上/候选 smoke 检查
 | 改动 | 最低验证要求 |
 | --- | --- |
 | 纯文档 | 链接、命令真实性、事实与规划区分、diff 范围 |
+| 功能模块增删/边界 | `npm run check:features`、`npm run typecheck`、`npm run build`、该功能对应的端到端命令 |
 | 内容/schema | 代表样本、异常输入、幂等、公开过滤、真实数量对账 |
 | 页面/路由/SEO | 生产 HTML、深链刷新、真实 404、RSS/sitemap/索引、无 JS 阅读 |
 | 三维交互 | 现有行为检查与实际浏览器交互，空槽/重复/快速切换/长期循环 |

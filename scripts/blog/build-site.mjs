@@ -9,6 +9,7 @@ const npm = process.platform === "win32" ? "npm.cmd" : "npm";
 
 const steps = [
   "check:content",
+  "check:features",
   "build:blog",
   "build:lab",
   "search:index",

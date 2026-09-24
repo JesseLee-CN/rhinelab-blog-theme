@@ -308,18 +308,26 @@ export async function runContentSuite(runtime, { baseUrl, lab, published, pagefi
     for (const sentinel of FIXTURE_SENTINELS) {
       check(!body.includes(sentinel), `文章正文不含夹具哨兵：${sentinel}`);
     }
-    // The lab's initial bundle must not carry full article bodies.
+    // The lab's initial bundle must not carry full article bodies — only the short
+    // abstracts the archive shows. The probe is read from the end of a real
+    // article's prose: a hardcoded sentence would silently stop matching once the
+    // sample content is replaced, and the check would then pass vacuously.
+    const bodyProbe = await page.evaluate(async (href) => {
+      const response = await fetch(href, { credentials: "omit" });
+      const doc = new DOMParser().parseFromString(await response.text(), "text/html");
+      const text = (doc.querySelector(".prose")?.textContent ?? "").replace(/\s+/g, "");
+      return text.length >= 60 ? text.slice(-30) : null;
+    }, published.posts.find((entry) => entry.id === "wp-55")?.path ?? published.posts[0]?.path ?? "/");
+    put("bodyProbe", bodyProbe);
+    check(typeof bodyProbe === "string" && bodyProbe.length >= 30, "取得真实文章正文探针", bodyProbe);
     const labChunk = await page.request.get(`${baseUrl}/lab/`);
     const chunkPath = /src="(\/lab\/assets\/index-[^"]+\.js)"/.exec(await labChunk.text())?.[1] ?? null;
     put("labChunk", chunkPath);
     check(chunkPath !== null, "lab 首页引用初始 chunk");
-    if (chunkPath) {
+    if (chunkPath && typeof bodyProbe === "string") {
       const chunk = await page.request.get(`${baseUrl}${chunkPath}`);
       const code = await chunk.text();
-      check(
-        !/参考资料/.test(code) && !/依赖升级后的数据库报错排查/.test(code.slice(0, 200_000)),
-        "初始 chunk 不含文章正文",
-      );
+      check(!code.includes(bodyProbe), "初始 chunk 不含文章正文");
       for (const sentinel of FIXTURE_SENTINELS) check(!code.includes(sentinel), `初始 chunk 不含夹具哨兵：${sentinel}`);
     }
   });

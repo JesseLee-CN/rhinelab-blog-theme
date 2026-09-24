@@ -5,8 +5,8 @@
 // entrance, then reports a single handoff commit. All trajectory math lives in
 // the pure boot-intro-motion module; this class only writes DOM. It never
 // requests authentication.
-import { brandHeading, logo } from "./brand";
-import { BootLettering } from "./boot-lettering";
+import { brandHeading, logo } from "../../brand";
+import { BootLettering } from "../../boot-lettering";
 import {
   DOCKING_MS,
   EXIT_MS,
@@ -16,8 +16,8 @@ import {
   introLayout,
   logoStateAt,
   type IntroLayout,
-} from "./boot-intro-motion";
-import type { ChosenIdentity, IntroPhase } from "./boot-identity";
+} from "./intro-motion";
+import type { ChosenIdentity, IntroPhase } from "./identity";
 
 // Size of the legacy loading mark (style.css `.loading-mark`).
 const CONNECTING = { width: 150, height: 90 } as const;

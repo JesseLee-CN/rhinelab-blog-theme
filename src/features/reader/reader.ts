@@ -13,10 +13,10 @@
  * never reads `records[selected]`, and only reports `inputSuspended` changes so
  * the 3D application can pause its own input handling (CONTRACT.md §3, §13).
  */
-import type { FetchLike, LoadResult, TimerApi } from "./article-reader-content.ts";
-import { createReaderToc } from "./article-reader-toc.ts";
-import { SurfaceTransition } from "./ui-transitions.ts";
-import { viewportLayout } from "./viewport-layout.ts";
+import type { FetchLike, LoadResult, TimerApi } from "./loader.ts";
+import { createReaderToc } from "./toc.ts";
+import { SurfaceTransition } from "../../ui-transitions.ts";
+import { viewportLayout } from "../../viewport-layout.ts";
 import {
   createMemoryScrollStorage,
   createReaderScrollStore,
@@ -24,9 +24,9 @@ import {
   restoreScrollTop,
   type ReaderScrollStorage,
   type ReaderScrollStore,
-} from "../shared/reading/scroll-store.ts";
-import { readerWindow, type ReaderWindow, type ReaderWindowLayout } from "../shared/reading/geometry.ts";
-import type { ConvertResult } from "../shared/reading/content.ts";
+} from "../../../shared/reading/scroll-store.ts";
+import { readerWindow, type ReaderWindow, type ReaderWindowLayout } from "../../../shared/reading/geometry.ts";
+import type { ConvertResult } from "../../../shared/reading/content.ts";
 
 export type ReaderTarget = Readonly<{
   postId: string;
@@ -56,7 +56,7 @@ export type ReaderDependencies = {
    * no static dependency on the content stack: the application imports it on
    * demand from `./article-reader-content.ts`.
    */
-  load: (options: import("./article-reader-content.ts").LoadOptions) => Promise<LoadResult>;
+  load: (options: import("./loader.ts").LoadOptions) => Promise<LoadResult>;
   fetch?: FetchLike;
   timers?: TimerApi;
   motionTimers?: { setTimeout: (handler: () => void, ms: number) => number; clearTimeout: (handle: number) => void };

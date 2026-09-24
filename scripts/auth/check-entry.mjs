@@ -231,14 +231,19 @@ try {
     stats.identity?.kind === "registered",
     JSON.stringify(stats.identity),
   );
+  // 展示名是「服务端返回用户名的全大写」（identity.ts 的 usernameLabel 只做大写，
+  // 不去分隔符），所以期望值从实际提交的用户名派生，而不是写死去掉下划线的形式。
+  const submitted = await page.inputValue("#entry-username");
+  const expectedLabel = submitted.toUpperCase();
   check(
-    "identity label uppercased",
-    stats.identity?.label === "JOYCEMOORE",
-    stats.identity?.label,
+    "identity label is the uppercased username",
+    stats.identity?.label === expectedLabel,
+    `${stats.identity?.label} ≠ ${expectedLabel}`,
   );
   check(
     "footer shows registered label",
-    (await page.textContent("#session-identity"))?.trim() === "JOYCEMOORE",
+    (await page.textContent("#session-identity"))?.trim() === expectedLabel,
+    expectedLabel,
   );
   check(
     "stage no longer inert",

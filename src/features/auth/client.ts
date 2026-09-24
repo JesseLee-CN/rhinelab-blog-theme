@@ -4,7 +4,7 @@
 //
 // Flow state is keyed by attemptId: a late openFlow/cancel completion can only
 // clean up its own context and never clobber a newer attempt.
-import type { BootIdentity } from "./boot-identity";
+import type { BootIdentity } from "./identity";
 
 export interface PublicUser {
   id: string;

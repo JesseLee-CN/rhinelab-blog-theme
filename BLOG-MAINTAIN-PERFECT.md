@@ -160,7 +160,8 @@ git add -A && git commit -m "post: <标题>" && git push
 ### 5.1 沉浸式全文阅读（reader）
 
 窗口、控件、目录导航与 markdown 参数的现行说明见 [docs/READER.md](docs/READER.md)，
-实现为 `src/article-reader*.ts` 与 `src/article-reader-markdown.css`。单元与端到端检查：
+实现为功能模块 `src/features/reader/`（入口与边界见 [docs/FEATURES.md](docs/FEATURES.md)）。
+单元与端到端检查：
 
 ```bash
 npm run test:reader

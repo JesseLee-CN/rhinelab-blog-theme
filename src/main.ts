@@ -41,15 +41,8 @@ import { TerminalAudio } from "./audio";
 import { audioSettingsMarkup } from "./audio-settings";
 import { paintTheme, themeSettingsMarkup, type ThemePreference } from "./theme-ui";
 import { loadBootWebfonts } from "./boot-lettering";
-import "./boot-entry.css";
-import { BootEntry } from "./boot-entry";
-import { createAuthClient, type IdentityPort } from "./auth-client";
-import type { BootIdentity, ChosenIdentity, EntryPanelPhase, IntroPhase } from "./boot-identity";
-import "./boot-intro.css";
-import { BootIntro } from "./boot-intro";
-import { HANDOFF_APP_TIME } from "./boot-intro-motion";
-import type { ReaderTarget, ImmersiveReader } from "./article-reader";
-import "./article-reader.css";
+import { createEntryFeature, HANDOFF_APP_TIME, type ChosenIdentity } from "./features/auth";
+import { createReaderFeature, READER_ENTRY_SELECTOR } from "./features/reader";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -113,203 +106,59 @@ let modal: "search" | "saved" | "settings" | null = null,
 let activeTab = "overview";
 const reviewParams = new URLSearchParams(location.search);
 
-// --- immersive reader (IR4) ---
-// The reader module (and with it the HTML parsing stack) is imported on demand:
-// the lab's initial bundle must not pay for it (plan §5.3.2, §11.3).
-let reader: ImmersiveReader | null = null;
-let readerModulePending: Promise<ImmersiveReader> | null = null;
-let readerLastFocus: HTMLElement | null = null;
-/** Last openReader outcome; read-only diagnostic for the IR4 integration evidence. */
-let readerDecline = "idle";
-const readerActive = () => reader?.isActive === true;
-const READER_ENTRY_SELECTOR = '[data-action="read-immersive"]';
-/** True when the event belongs to the reader surface (dialog + top layer). */
-const fromReaderSurface = (event: Event): boolean => event.target instanceof Element && Boolean(event.target.closest("dialog.article-reader"));
-const readerPending = { token: 0, link: null as HTMLAnchorElement | null };
-const readerTargetFor = (link: HTMLAnchorElement): ReaderTarget | null => {
-  const record = records[selected];
-  if (!record) return null;
-  const href = link.getAttribute("href") ?? record.href;
-  if (!href) return null;
-  return { postId: record.postId, href, title: record.title };
-};
-async function ensureReader(): Promise<ImmersiveReader> {
-  if (reader) return reader;
-  readerModulePending ??= (async () => {
-    const [mod, content] = await Promise.all([import("./article-reader"), import("./article-reader-content")]);
-    const installed = mod.installArticleReader({
-      origin: location.origin,
-      // Mounted outside `#stage`: the reader is its own top-layer surface and
-      // must not be captured by the stage's inert snapshot or modal inert sweep.
-      mount: document.body,
-      stylesheetHref: null,
-      load: content.loadArticleContent,
-      onInputSuspended: (value) => scene?.setInputSuspended(value),
-      onChange: (snapshot) => {
-        if (snapshot.state === "closed") {
-          const target = readerLastFocus;
-          readerLastFocus = null;
-          // The reader owns the exit animation; sync the UI once it is done.
-          if (target && target.isConnected && document.contains(target)) {
-            target.focus({ preventScroll: true });
-          }
-        }
-      },
-    });
-    reader = installed.reader;
-    return reader;
-  })().catch((error) => {
-    readerModulePending = null;
-    throw error;
-  });
-  return readerModulePending;
-}
-async function openReader(link: HTMLAnchorElement): Promise<void> {
-  const decline = (why: string) => {
-    readerDecline = why;
-  };
-  readerDecline = "entered";
-  if (identityActive()) return decline("identity");
-  if (!ready) return decline("not-ready");
-  if (!link.isConnected) return decline("link-disconnected");
-  const target = readerTargetFor(link);
-  if (!target) return decline("no-target");
-  const token = ++readerPending.token;
-  readerPending.link = link;
-  notify("正在准备全文阅读…");
-  let instance: ImmersiveReader;
-  try {
-    instance = await ensureReader();
-  } catch {
-    if (token === readerPending.token) readerPending.link = null;
-    notify("全文阅读模块加载失败，已打开独立文章页");
-    return decline("import-failed");
-  }
-  // Re-check ownership after the await: the user may have left the detail, the
-  // selection may have changed, or another link may have been clicked.
-  if (token !== readerPending.token) return decline("superseded");
-  readerPending.link = null;
-  if (mode !== "detail") return decline(`mode:${mode}`);
-  if (identityActive()) return decline("identity-after-await");
-  if (!link.isConnected) return decline("link-disconnected-after-await");
-  const current = readerTargetFor(link);
-  if (!current) return decline("no-target-after-await");
-  if (current.href !== target.href || current.postId !== target.postId) return decline("target-changed");
-  readerLastFocus = link;
-  const opened = instance.open(current, link);
-  if (!opened) {
-    readerLastFocus = null;
-    notify("无法打开沉浸式阅读，已打开独立文章页");
-    return decline(`open-returned-false:${instance.state}`);
-  }
-  decline("opened");
-  audio.play("page-open");
-}
-/** Programmatic transitions: close the reader first, then perform the action. */
-async function withReaderClosed<T>(action: () => T | Promise<T>): Promise<T> {
-  if (reader) await reader.close("context-change", { restoreFocus: false });
-  readerPending.token += 1;
-  readerPending.link = null;
-  return action();
-}
+// --- immersive reader（功能模块：src/features/reader/）---
+// 阅读层的窗口、内容加载、目录导航与集成状态机都在功能模块内部；这里只装配宿主
+// 端口，核心不直接接触 ImmersiveReader。该模块连同它的 HTML 解析栈与样式表按需
+// 加载，三维入口的首屏 bundle 不为它付费（IR 计划 §5.3.2、§11.3）。
+const readerFeature = createReaderFeature({
+  currentTarget: () => {
+    const record = records[selected];
+    return record ? { postId: record.postId, href: record.href, title: record.title } : null;
+  },
+  isArchiveReady: () => ready,
+  isIdentityGateActive: () => identityActive(),
+  currentMode: () => mode,
+  notify: (message) => notify(message),
+  playSound: (name) => audio.play(name),
+  setSceneInputSuspended: (value) => scene?.setInputSuspended(value),
+});
+const readerActive = () => readerFeature.isActive();
+/** 事件是否属于阅读层表面（弹框与其顶层）。 */
+const fromReaderSurface = (event: Event) => readerFeature.ownsEvent(event);
 
-// --- boot identity phase (G4/L1a) ---
-let entry: BootEntry | undefined;
-let authPort: IdentityPort | undefined;
-let introPhase: IntroPhase = "connecting";
-let panelPhase: EntryPanelPhase = "login";
-let panelBusy = false;
-let currentIdentity: BootIdentity = { kind: "none" };
-let currentLabel = "JOYCE MOORE";
-let requestedScene: string | null = null;
-const entryDone = () => introPhase === "playing" || introPhase === "entered";
-const identityActive = () => !entryDone();
-function applyEntryInert() {
-  const active = identityActive();
-  const stage = document.querySelector<HTMLElement>("#stage");
-  if (stage) stage.inert = active;
-  const mobile = document.querySelector<HTMLElement>(".mobile-entry");
-  if (mobile) mobile.hidden = active;
-}
-async function resolvePort(params: URLSearchParams): Promise<IdentityPort> {
-  if (import.meta.env.DEV && params.has("entryMock")) {
-    const { createDevIdentityPort } = await import("./auth-dev");
-    return createDevIdentityPort(params.get("entryMock"));
-  }
-  return createAuthClient();
-}
-// Prepare the first visible original frame (169) silently, then let the intro
-// run its exit and commit exactly once.
-function prepareBootFrame(identity: ChosenIdentity): void {
-  currentIdentity = identity;
-  currentLabel = identity.label;
-  const footerIdentity = document.querySelector<HTMLElement>("#session-identity");
-  if (footerIdentity) footerIdentity.textContent = currentLabel;
-  // 备案信息（按需填写）：需要展示备案号时，可在此处把备案 DOM 挂到 .system-footer 内。
-  bootSequence.update(HANDOFF_APP_TIME, currentLabel);
+// --- 启动身份门（功能模块：src/features/auth/）---
+// 序幕、登录/注册面板、会话端口与身份状态机都在功能模块内部；这里只保留核心侧的
+// 交接动作（开场影片时间轴、舞台 inert、场景切换），以及功能模块借用宿主能力时
+// 用到的端口实现。
+/** 身份确定后、序幕退场前静默准备第一可见帧（原创帧 169，不播放）。 */
+function prepareBootFrame(identity: ChosenIdentity, appTime: number): void {
+  bootSequence.update(appTime, identity.label);
   const stage = document.querySelector<HTMLElement>("#stage");
   if (stage) stage.dataset.boot = "access";
   const caption = document.querySelector<HTMLElement>("#cinema-caption");
   if (caption) caption.textContent = "";
   lastStep = "access";
 }
+/** 序幕退场结束：交出舞台；需要时继续播放开场影片，否则直接进入档案。 */
 function commitBootHandoff(identity: ChosenIdentity, rafMs: number): void {
-  intro.hide();
+  entryFeature.hide();
   const stage = document.querySelector<HTMLElement>("#stage");
   if (stage) stage.inert = false;
   const mobile = document.querySelector<HTMLElement>(".mobile-entry");
   if (mobile) mobile.hidden = false;
-  if (!motionActive("boot") || requestedScene === "archive" || requestedScene === "detail") {
-    introPhase = "entered";
-    setMode(requestedScene === "detail" ? "detail" : "archive");
+  const requested = entryFeature.requestedScene();
+  if (!motionActive("boot") || requested === "archive" || requested === "detail") {
+    entryFeature.setPhase("entered");
+    setMode(requested === "detail" ? "detail" : "archive");
     return;
   }
-  introPhase = "playing";
+  entryFeature.setPhase("playing");
   bootStart = rafMs / 1000 - HANDOFF_APP_TIME;
   lastStep = "";
   audio.restartBoot();
   scene.select(0);
   selected = 0;
   updateSelection();
-}
-function startBootWith(identity: ChosenIdentity) {
-  audio.releaseEntry();
-  void audio.unlock();
-  prepareBootFrame(identity);
-  intro.requestExit(identity);
-}
-function identitySummary() {
-  if (currentIdentity.kind === "registered") return `当前身份 <strong>${escapeHtml(currentIdentity.label)}</strong>`;
-  if (currentIdentity.kind === "guest") return "访客身份 <strong>GUEST</strong>";
-  return "尚未选择身份";
-}
-// Explicit "switch identity" path: replay keeps the current identity, only this
-// reopens the selection page (CONTRACT.md §3.1).
-function switchIdentity() {
-  if (!entry) return;
-  if (readerActive()) void reader?.close("context-change", { restoreFocus: false });
-  setMode("boot");
-  intro.showIdentity();
-  entry.reset();
-  entry.show();
-  // Refresh the remembered user so an expired or revoked session never offers
-  // a one-click continue.
-  void authPort?.session()
-    .then((state) => entry?.setRemembered(state.authenticated ? state.user : null))
-    .catch(() => entry?.setRemembered(null));
-}
-// Real server logout; a failed logout is reported, never faked as success.
-async function doLogout() {
-  if (!authPort) return;
-  if (readerActive()) await reader?.close("context-change", { restoreFocus: false });
-  try {
-    const state = await authPort.session();
-    if (state.authenticated) await authPort.logout(state.csrfToken);
-    notify("已退出登录");
-  } catch {
-    notify("退出未确认，请重试");
-  }
-  switchIdentity();
 }
 
 let frozenTime =
@@ -378,29 +227,34 @@ paintTheme(resolvedDark() ? 1 : 0);
 systemPrefersDark.addEventListener("change", () => {
   if (prefs.colorTheme === "system") savePrefs();
 });
-// LOGIN-IMPROVE L1b: the intro curtain is created before start() awaits any
-// resource, so the first paint already uses the safe background and the stage
-// is never exposed uninitialised.
-const introCoversStage = () =>
-  introPhase === "connecting" ||
-  introPhase === "docking" ||
-  introPhase === "ready" ||
-  introPhase === "exiting";
-function applyIntroVisibility(): void {
-  const stage = document.querySelector<HTMLElement>("#stage");
-  if (stage) stage.style.visibility = introCoversStage() ? "hidden" : "";
-}
-const intro = new BootIntro({
+// 功能模块装配点：序幕在任何 await 之前创建，首帧即由它遮挡舞台（LOGIN-IMPROVE L1b）。
+// host 只暴露核心真正拥有的能力，功能模块据此工作，移除它不会牵动核心循环。
+const entryFeature = createEntryFeature({
   viewport: $("#viewport"),
   reducedMotion: motionIsReduced(),
-  onReady: () => entry?.show(),
-  onCommit: (identity, rafMs) => commitBootHandoff(identity, rafMs),
-  onPhase: (phase) => {
-    introPhase = phase;
-    applyIntroVisibility();
+  host: {
+    prepareBootFrame,
+    commitBootHandoff,
+    setGateInert: (active) => {
+      const stage = document.querySelector<HTMLElement>("#stage");
+      if (stage) stage.inert = active;
+      const mobile = document.querySelector<HTMLElement>(".mobile-entry");
+      if (mobile) mobile.hidden = active;
+    },
+    setStageHidden: (hidden) => {
+      const stage = document.querySelector<HTMLElement>("#stage");
+      if (stage) stage.style.visibility = hidden ? "hidden" : "";
+    },
+    engageAudio: () => {
+      audio.releaseEntry();
+      void audio.unlock();
+    },
+    closeOverlays: () => readerFeature.closeForContextChange(),
+    returnToBoot: () => setMode("boot"),
+    notify: (message) => notify(message),
   },
 });
-applyIntroVisibility();
+const identityActive = () => entryFeature.isGateActive();
 const rollingMotion = {
   duration: 460,
   motionBlur: true,
@@ -464,7 +318,7 @@ function recordAccess() {
   accessLog.unshift({
     id: records[selected].postId,
     time: new Date().toLocaleTimeString("en-GB"),
-    label: currentLabel,
+    label: entryFeature.label(),
   });
 }
 function saveAudioPrefs() {
@@ -534,8 +388,8 @@ function fit() {
     scene?.resize();
     viewer?.resize();
   }
-  intro.resize();
-  intro.setStageRect({
+  entryFeature.resize();
+  entryFeature.setStageRect({
     left: viewport.clientWidth / 2 - (width * scale) / 2,
     top: viewport.clientHeight / 2 - (height * scale) / 2,
     width: width * scale,
@@ -609,7 +463,7 @@ function setMode(next: Mode) {
 }
 function select(index: number, navigation?: ArchiveNavigation) {
   // A selection change closes the reader without restoring focus to its opener.
-  if (readerActive()) void reader?.close("context-change", { restoreFocus: false });
+  readerFeature.closeIfActive();
   selected = (index + records.length) % records.length;
   columnMemory[fileLocation(selected).lane] = selected;
   if (mode === "detail") setMode("archive");
@@ -682,7 +536,7 @@ function updateSelection(navigation?: ArchiveNavigation) {
 }
 function replayBoot(forcePreview = false) {
   if (!ready) return;
-  void withReaderClosed(() => closeModal(() => replayBootAfterModal(forcePreview)));
+  void readerFeature.withClosed(() => closeModal(() => replayBootAfterModal(forcePreview)));
 }
 function replayBootAfterModal(forcePreview: boolean) {
   bootStart = performance.now() / 1000 - 1.76;
@@ -697,7 +551,7 @@ function replayBootAfterModal(forcePreview: boolean) {
 }
 function openFile() {
   if (!ready) return;
-  void withReaderClosed(() => {
+  void readerFeature.withClosed(() => {
     closeModal(() => {
       setMode("detail");
       audio.play("open");
@@ -792,7 +646,7 @@ function notify(message: string) {
 
 function openModal(kind: NonNullable<typeof modal>) {
   if (!ready) return;
-  void withReaderClosed(() => {
+  void readerFeature.withClosed(() => {
     if (!modal) {
       previousFocus = document.activeElement as HTMLElement;
       modalSiblings = [...$("#stage").children]
@@ -889,7 +743,7 @@ function motionPreferenceNoteMarkup() {
   return `<div id="motion-preference-note" class="motion-preference-note"><p>${motionSummary(prefs.motion)}</p><span>预设：${preset === "full" ? "完整动画" : preset === "reduced" ? "减少动画" : "自定义"} · 选择会保存在本站</span>${allEnabled ? "" : '<button data-action="enable-motion">启用完整动画并重播 ↻</button>'}</div>`;
 }
 function settingsMarkup() {
-  return `<h2>SYSTEM SETTINGS<small>终端偏好设置</small></h2><p class="settings-intro">${identitySummary()} <span>·</span> 收藏按本设备保存</p><div class="settings-list">${themeSettingsMarkup(prefs.colorTheme)}${audioSettingsMarkup(prefs)}</div>${motionPreferenceNoteMarkup()}${motionSettingsMarkup(prefs.motion, prefs.motionPreset)}${qualityMarkup(prefs.rendering)}${pwaSettingsMarkup()}<div class="settings-shortcuts"><span>KEYBOARD CONTROLS</span><p><kbd>←</kbd><kbd>→</kbd> 切列 <kbd>↑</kbd><kbd>↓</kbd> 选档 <kbd>ENTER</kbd> 读取 <kbd>/</kbd> 检索 <kbd>ESC</kbd> 返回</p></div><div class="settings-bottom">${document.fullscreenEnabled ? '<button data-action="fullscreen">FULLSCREEN <span>↗</span></button>' : ''}<button data-action="switch-identity">切换身份 <span>⇄</span></button>${currentIdentity.kind === "registered" ? '<button data-action="logout">退出登录 <span>⏻</span></button>' : ''}<button data-action="restart">REINITIALIZE SYSTEM <span>↻</span></button></div><div class="modal-bottom"><span>ANALYSIS OS / 1.0 · 字体 MiSans（小米，允许免费商用与网页嵌入）与 JetBrains Maple Mono（OFL-1.1） · <a href="${assetUrl("fonts/MiSans-license.pdf")}" target="_blank" rel="noopener">许可 A</a> / <a href="${assetUrl("fonts/JetBrains-Maple-Mono-OFL.txt")}" target="_blank" rel="noopener">许可 B</a></span><span>POWERED BY RHINE LAB</span></div>`;
+  return `<h2>SYSTEM SETTINGS<small>终端偏好设置</small></h2><p class="settings-intro">${entryFeature.summaryMarkup()} <span>·</span> 收藏按本设备保存</p><div class="settings-list">${themeSettingsMarkup(prefs.colorTheme)}${audioSettingsMarkup(prefs)}</div>${motionPreferenceNoteMarkup()}${motionSettingsMarkup(prefs.motion, prefs.motionPreset)}${qualityMarkup(prefs.rendering)}${pwaSettingsMarkup()}<div class="settings-shortcuts"><span>KEYBOARD CONTROLS</span><p><kbd>←</kbd><kbd>→</kbd> 切列 <kbd>↑</kbd><kbd>↓</kbd> 选档 <kbd>ENTER</kbd> 读取 <kbd>/</kbd> 检索 <kbd>ESC</kbd> 返回</p></div><div class="settings-bottom">${document.fullscreenEnabled ? '<button data-action="fullscreen">FULLSCREEN <span>↗</span></button>' : ''}<button data-action="switch-identity">切换身份 <span>⇄</span></button>${entryFeature.canLogout() ? '<button data-action="logout">退出登录 <span>⏻</span></button>' : ''}<button data-action="restart">REINITIALIZE SYSTEM <span>↻</span></button></div><div class="modal-bottom"><span>ANALYSIS OS / 1.0 · 字体 MiSans（小米，允许免费商用与网页嵌入）与 JetBrains Maple Mono（OFL-1.1） · <a href="${assetUrl("fonts/MiSans-license.pdf")}" target="_blank" rel="noopener">许可 A</a> / <a href="${assetUrl("fonts/JetBrains-Maple-Mono-OFL.txt")}" target="_blank" rel="noopener">许可 B</a></span><span>POWERED BY RHINE LAB</span></div>`;
 }
 
 document.addEventListener("input", (e) => {
@@ -980,7 +834,7 @@ document.addEventListener("click", (e) => {
     }
     if (identityActive()) return;
     e.preventDefault();
-    void openReader(immersive);
+    void readerFeature.open(immersive);
     return;
   }
   const themeButton = (e.target as Element).closest<HTMLElement>("[data-color-theme]");
@@ -1008,7 +862,7 @@ document.addEventListener("click", (e) => {
   }
   if (el.dataset.result) {
     const index = Number(el.dataset.result);
-    void withReaderClosed(() =>
+    void readerFeature.withClosed(() =>
       closeModal(() => {
         select(index);
         openFile();
@@ -1048,7 +902,7 @@ document.addEventListener("click", (e) => {
     // Safari does not always focus a button when it is tapped. Capture the
     // actual opener so closing the modal reliably restores the right control.
     el.focus({ preventScroll: true });
-    void withReaderClosed(() => {
+    void readerFeature.withClosed(() => {
       viewer ??= new ModelViewer($("#stage"), () => { audio.setScene(mode); audio.play("page-close"); }, (sound) => audio.play(sound === "tick" ? "ui-tick" : sound));
       audio.setScene("viewer");
       viewer.setQuality(prefs.rendering);
@@ -1088,10 +942,10 @@ document.addEventListener("click", (e) => {
     replayBoot();
   }
   if (action === "switch-identity") {
-    void withReaderClosed(() => closeModal(() => switchIdentity()));
+    void readerFeature.withClosed(() => closeModal(() => entryFeature.switchIdentity()));
   }
   if (action === "logout") {
-    void withReaderClosed(() => closeModal(() => void doLogout()));
+    void readerFeature.withClosed(() => closeModal(() => void entryFeature.logout()));
   }
   if (action === "fullscreen" && document.fullscreenEnabled) {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -1195,18 +1049,12 @@ for (const type of ["pointerdown", "wheel", "touchstart"] as const) {
     { capture: true, passive: false },
   );
 }
-// Programmatic entry points that are also reachable from the dev review hooks.
-function releaseReaderForPageHide(): void {
-  readerPending.token += 1;
-  readerPending.link = null;
-  if (reader?.isActive) void reader.close("context-change", { restoreFocus: false });
-}
-window.addEventListener("pagehide", releaseReaderForPageHide);
+// bfcache 恢复：阅读层的锁由功能模块自理，核心只恢复三维输入。
 window.addEventListener("pageshow", (event) => {
   if (!event.persisted) return;
   // Restored from the back/forward cache: make sure no lock survives and the
   // detail surface is operable again.
-  releaseReaderForPageHide();
+  readerFeature.release();
   scene?.setInputSuspended(false);
 });
 
@@ -1214,13 +1062,13 @@ const ease = (t: number) => {  t = Math.max(0, Math.min(1, t));
   return t * t * (3 - 2 * t);
 };
 function bootFrame(t: number) {
-  audio.updateBoot(t, frozenTime !== null, currentLabel);
-  const motion = bootSequence.update(t, currentLabel);
+  audio.updateBoot(t, frozenTime !== null, entryFeature.label());
+  const motion = bootSequence.update(t, entryFeature.label());
   let step: string = motion.step;
   let caption =
     motion.step === "auth"
       ? t < 9.52
-        ? `身份信息确认：${currentLabel}`
+        ? `身份信息确认：${entryFeature.label()}`
         : t < 11.84
           ? "请求已接收"
           : "开始处理"
@@ -1276,7 +1124,7 @@ let lastTime = 0,
   fps = 0;
 function frame(ms: number) {
   if (document.hidden) { requestAnimationFrame(frame); return; }
-  intro.tick(ms);
+  entryFeature.tick(ms);
   const time = ms / 1000;
   const theme = scene?.themeAmount ?? (resolvedDark() ? 1 : 0);
   paintTheme(theme);
@@ -1320,7 +1168,7 @@ function frame(ms: number) {
 }
 async function start() {
   if (records.length === 0) {
-    intro.resourcesFailed(
+    entryFeature.resourcesFailed(
       "暂无公开文章。三维档案入口需要至少一篇公开文章。请返回文章列表阅读。",
     );
     return;
@@ -1375,9 +1223,8 @@ async function start() {
     if (devPreview) {
       // Deterministic reference preview: bypass the identity gate entirely and
       // keep the legacy label so existing frame checks are unchanged.
-      currentIdentity = { kind: "registered", userId: "legacy", username: "JOYCE MOORE", label: "JOYCE MOORE" };
-      currentLabel = "JOYCE MOORE";
-      intro.hideForPlayback();
+      entryFeature.usePlaybackIdentity("JOYCE MOORE");
+      entryFeature.hideForPlayback();
       audio.releaseEntry();
       bootStart = performance.now() / 1000;
       bootStart -= params.has("time") ? Number(params.get("time")) : 1.76;
@@ -1390,36 +1237,14 @@ async function start() {
       void initPwa(notify);
       return;
     }
-    requestedScene = params.get("scene");
-    const port = await resolvePort(params);
-    authPort = port;
-    // The session cookie is persistent; surface a one-click continue when the
-    // server still recognises this browser.
-    const restored = await port.session().catch(() => null);
-    entry = new BootEntry({
-      mount: intro.panel,
-      port,
-      session: restored?.authenticated ? restored.user : null,
-      onIdentityChosen: startBootWith,
-      onEngage: () => {
-        audio.releaseEntry();
-        void audio.unlock();
-      },
-      onPanelPhase: (phase, busy) => {
-        panelPhase = phase;
-        panelBusy = busy;
-        applyEntryInert();
-      },
-    });
-    intro.measurePanel();
-    applyEntryInert();
-    intro.resourcesReady();
+    // 会话恢复、身份端口与面板挂载都在功能模块内部完成。
+    await entryFeature.start(params);
     requestAnimationFrame(frame);
     void initPwa(notify);
   } catch (error) {
     console.error(error);
     audio.releaseEntry();
-    intro.resourcesFailed("");
+    entryFeature.resourcesFailed("");
   }
 }
 updateSelection();
@@ -1475,21 +1300,10 @@ Object.assign(window, {
       theme: Number((scene?.themeAmount ?? (resolvedDark() ? 1 : 0)).toFixed(3)),
       colorTheme: prefs.colorTheme,
       resolvedTheme: resolvedDark() ? "dark" : "light",
-      introPhase,
-      panelPhase,
-      panelBusy,
+      ...entryFeature.snapshot(),
       introLogos: document.querySelectorAll("#intro-logo").length,
       stageVisibility: getComputedStyle($("#stage")).visibility,
-      identity: currentIdentity,
-      reader: {
-        active: readerActive(),
-        state: reader?.state ?? "none",
-        load: reader?.loadState ?? "none",
-        pendingLink: readerPending.link?.getAttribute("href") ?? null,
-        pendingToken: readerPending.token,
-        lastDecline: readerDecline,
-        moduleLoaded: Boolean(reader),
-      },
+      reader: readerFeature.snapshot(),
       bootTime: mode === "boot" ? (frozenTime ?? performance.now() / 1000 - bootStart) + 5 : null,
       selected: records[selected].postId,
       saved: [...saved],
@@ -1500,11 +1314,8 @@ Object.assign(window, {
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     audio.dispose();
-    // A hot update must not leave a second reader, its listeners or its locks.
-    readerPending.token += 1;
-    readerPending.link = null;
-    reader?.dispose();
-    reader = null;
-    readerModulePending = null;
+    // 热更新不得留下第二份序幕/面板 DOM、第二个阅读层或其监听器与输入锁。
+    entryFeature.dispose();
+    readerFeature.dispose();
   });
 }

@@ -11,7 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "../..");
 const { bootMotion } = loadTs(resolve(repoRoot, "src/boot-motion.ts"));
 const { typingFramesFor, computeFrames, TYPING_FRAMES, LEGACY_LABEL } = loadTs(resolve(repoRoot, "src/typing-rhythm.ts"));
-const { validateUsername, usernameLabel } = loadTs(resolve(repoRoot, "src/boot-identity.ts"));
+const { validateUsername, usernameLabel } = loadTs(resolve(repoRoot, "src/features/auth/identity.ts"));
 
 const checks = [];
 const check = (name, fn) => {

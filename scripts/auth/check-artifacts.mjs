@@ -66,6 +66,10 @@ for (const file of files) {
 
 // 3. Normal blog pages must not load the 3D/boot/login bundles. /lab/ is a
 // separate entry and may be linked, but article HTML must stay static.
+// 功能相关的 chunk 名来自 features.manifest.json：重命名功能产物不会悄悄削弱这条规则。
+const manifest = JSON.parse(readFileSync(resolve("features.manifest.json"), "utf8"));
+const featureMarkers = [...new Set((manifest.features ?? []).flatMap((feature) => feature.runtimeMarkers ?? []))];
+const labAssetPattern = new RegExp(["(^|/)(lab)/", "three", "main-", ...featureMarkers].join("|"));
 const scriptOrLink = /<(script|link)\b[^>]*(src|href)="([^"]+)"/gi;
 for (const file of files) {
   if (!file.endsWith(".html")) continue;
@@ -73,7 +77,7 @@ for (const file of files) {
   const body = readFileSync(file, "utf8");
   for (const match of body.matchAll(scriptOrLink)) {
     const url = match[3];
-    if (/(^|\/)(lab)\//.test(url) || /three|boot-entry|auth-client|main-/.test(url)) {
+    if (labAssetPattern.test(url)) {
       fail("blog-loads-lab-asset", file, url);
     }
   }

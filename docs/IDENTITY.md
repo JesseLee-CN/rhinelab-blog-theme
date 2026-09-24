@@ -3,6 +3,10 @@
 `/lab/` 在开场动画之前会显示身份选择：**REGISTERED USER** 走同源认证服务，**GUEST** 直接进入。
 认证是**可选组件**——服务不可用时 GUEST 与全部公开阅读仍然可用，认证故障不会影响博客。
 
+前端是一个自包含功能模块 `src/features/auth/`：`entry.ts` 是身份门状态机与宿主端口契约，
+`intro.ts` 是序幕幕布、`panel.ts` 是登录/注册面板、`identity.ts` 是纯规则、`client.ts` 是同源
+认证端口。模块边界、`EntryHost` 端口与增删流程见 [FEATURES.md](FEATURES.md)。
+
 ## 1. 三种身份
 
 | 身份 | 来源 | 说明 |
@@ -141,6 +145,7 @@ npm run test:packaging    # 打包与配对（需要 Go 工具链构建二进制
 ## 10. 相关文档
 
 - [docs/README.md](README.md)：文档索引
+- [FEATURES.md](FEATURES.md)：功能模块划分（`auth` 模块的端口、门面与增删流程）
 - [BUILD.md](BUILD.md)：构建与发布（含认证服务部署）
 - [../services/lab-auth/README.md](../services/lab-auth/README.md)：服务实现与本地运行
 - [../services/lab-auth/openapi.yaml](../services/lab-auth/openapi.yaml)：接口真源

@@ -11,20 +11,22 @@
 
 ## 2. 构建顺序
 
-`npm run build` 按固定顺序执行五步，后续步骤不会清空前序产物：
+`npm run build` 按固定顺序执行六步，后续步骤不会清空前序产物：
 
 | 顺序 | 命令 | 作用 |
 | --- | --- | --- |
 | 1 | `npm run check:content` | 内容 schema、路径唯一性、保留路由、封面、主题引用 |
-| 2 | `npm run build:blog` | 先 `prepare:assets` 暂存白名单资源，再由 Astro 输出到 `dist/` |
-| 3 | `npm run build:lab` | Vite 构建 `/lab/` 到 `dist/lab/` |
-| 4 | `npm run search:index` | Pagefind 生成全文检索索引到 `dist/pagefind/` |
-| 5 | `npm run check:site` | 产物完整性、未公开内容泄露、`/lab/` 边界、404 与 RSS/sitemap |
+| 2 | `npm run check:features` | 功能模块边界：清单一致、入口唯一、无跨功能穿透、无孤儿文件 |
+| 3 | `npm run build:blog` | 先 `prepare:assets` 暂存白名单资源，再由 Astro 输出到 `dist/` |
+| 4 | `npm run build:lab` | Vite 构建 `/lab/` 到 `dist/lab/`（阅读层与它的 CSS 为独立懒加载 chunk） |
+| 5 | `npm run search:index` | Pagefind 生成全文检索索引到 `dist/pagefind/` |
+| 6 | `npm run check:site` | 产物完整性、未公开内容泄露、`/lab/` 边界、404 与 RSS/sitemap |
 
 单独执行某一步：
 
 ```bash
 npm run check:content
+npm run check:features
 npm run build:blog
 npm run build:lab
 npm run search:index

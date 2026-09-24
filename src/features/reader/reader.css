@@ -16,7 +16,7 @@
  * pulled in below (inlined by the bundler).
  */
 @import "@reading/prose.css";
-@import "./article-reader-markdown.css";
+@import "./markdown.css";
 
 dialog.article-reader {
   position: fixed;

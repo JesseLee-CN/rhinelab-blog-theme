@@ -1,4 +1,4 @@
-// L1a pure-trajectory contract tests for src/boot-intro-motion.ts.
+// L1a pure-trajectory contract tests for src/features/auth/intro-motion.ts.
 import assert from "node:assert/strict";
 import test from "node:test";
 import { dirname, resolve } from "node:path";
@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { loadTs } from "./load-ts.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const m = loadTs(resolve(here, "../../src/boot-intro-motion.ts"));
+const m = loadTs(resolve(here, "../../src/features/auth/intro-motion.ts"));
 
 const LOGO = { width: 256, height: 153 };
 const FORM = { width: 423, height: 225 };

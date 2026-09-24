@@ -1,0 +1,47 @@
+{
+  "$comment": "开放仓库相对上游新增的功能清单。唯一事实来源：增删功能时同步本文件，并运行 npm run check:features。字段含义与增删流程见 docs/FEATURES.md。",
+  "features": [
+    {
+      "id": "auth",
+      "title": "启动身份门与登录/注册",
+      "dir": "src/features/auth",
+      "entry": "src/features/auth/index.ts",
+      "publicApi": ["createEntryFeature", "HANDOFF_APP_TIME"],
+      "hostPort": "EntryHost",
+      "facade": "EntryFeature",
+      "eager": true,
+      "reason": "序幕必须在初次绘制前遮挡舞台（LOGIN-IMPROVE L1b），因此随入口静态引入。",
+      "styles": ["panel.css", "intro.css"],
+      "styleEntry": "src/features/auth/index.ts",
+      "checks": ["test:identity", "test:intro", "test:entry", "check:entry", "check:intro", "check:flow"],
+      "reviewContract": ["introPhase", "panelPhase", "panelBusy", "identity"],
+      "runtimeMarkers": ["boot-entry", "boot-intro", "auth-client"],
+      "serverSide": ["services/lab-auth"],
+      "ops": ["ops/auth", "ops/nginx/auth-location.conf", "ops/systemd/example-auth.service"],
+      "scripts": ["scripts/auth"],
+      "shared": [],
+      "docs": ["docs/IDENTITY.md"]
+    },
+    {
+      "id": "reader",
+      "title": "沉浸式 Markdown 阅读",
+      "dir": "src/features/reader",
+      "entry": "src/features/reader/index.ts",
+      "publicApi": ["createReaderFeature", "READER_ENTRY_SELECTOR"],
+      "hostPort": "ReaderHost",
+      "facade": "ReaderFeature",
+      "eager": false,
+      "reason": "阅读层连同 HTML 解析栈与样式表按需加载，三维入口首屏不为它付费（IR 计划 §5.3.2、§11.3）。",
+      "styles": ["reader.css", "markdown.css"],
+      "styleEntry": "src/features/reader/styles.ts",
+      "checks": ["test:reader", "test:reader-e2e", "check:reader", "check:reader-content", "build:reader-fixtures"],
+      "reviewContract": ["active", "state", "load", "pendingLink", "pendingToken", "lastDecline", "moduleLoaded"],
+      "runtimeMarkers": ["article-reader", "reader-sheet"],
+      "serverSide": [],
+      "ops": [],
+      "scripts": ["scripts/reading"],
+      "shared": ["shared/reading"],
+      "docs": ["docs/READER.md"]
+    }
+  ]
+}

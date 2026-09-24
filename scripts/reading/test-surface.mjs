@@ -33,7 +33,7 @@ import {
   findAnchorId,
   restoreScrollTop,
 } from "../../shared/reading/scroll-store.ts";
-import { createArticleReader } from "../../src/article-reader.ts";
+import { createArticleReader } from "../../src/features/reader/reader.ts";
 import { createEvent, createStubDocument } from "./dom-stub.mjs";
 
 const root = resolve(fileURLToPath(new URL("../..", import.meta.url)));

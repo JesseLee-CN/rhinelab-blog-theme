@@ -7,7 +7,7 @@
  * context, duplicate-mapping slots, closing mid-animation, repeated Escape while
  * closing, and 50 open/close cycles.
  */
-import { openArticleDetail, openReader, closeReaderByEscape, poll, readerSnapshot, contextSnapshot, clickSelector, labScene, sleep } from "./harness.mjs";
+import { articleProseLength, openArticleDetail, openReader, closeReaderByEscape, poll, readerSnapshot, contextSnapshot, clickSelector, labScene, sleep } from "./harness.mjs";
 
 /** Where the dedicated link is, after making sure it is actually on screen. */
 async function entryPoint(page) {
@@ -154,7 +154,14 @@ export async function runInteractionSuite(runtime, { baseUrl, lab }) {
     put("opened", opened);
     await shot("reader-ready");
     check(opened.open && opened.contentNodes > 0, "点击阅读全文后 reader 就绪");
-    check(opened.textLength > 4000, "reader 正文字符数足够", opened.textLength);
+    // 期望值取自被服务的文章本身：模板的示例文章很短，写死 4000 会让这条永远失败。
+    const proseLength = await articleProseLength(page, articleHref);
+    put("proseLength", proseLength);
+    check(
+      proseLength === null || opened.textLength >= Math.floor(proseLength * 0.8),
+      "reader 渲染出整篇正文",
+      { actual: opened.textLength, proseLength },
+    );
     equal(opened.linkHref, articleHref, "reader 内独立页链接等于规范地址");
     check(opened.active, "打开后焦点在 reader 内");
 
@@ -227,13 +234,36 @@ export async function runInteractionSuite(runtime, { baseUrl, lab }) {
 
     await poll(page, readerSnapshot, (state) => state.state === "closed", 20_000, "reader fully closed");
     await sleep(250);
+    // 关闭后、重开前读出位置记录：恢复必须符合契约 §7 的锚点公式
+    // （anchorTop − anchorOffset，并按可达范围裁剪）。不能拿「最后一个锚点」当期望值：
+    // 文末之后还有内容时，最后一个锚点会落在可达滚动范围之外——长短文章都会如此。
+    const stored = await page.evaluate(() => {
+      const raw = sessionStorage.getItem("rhine.reader.scroll.v1");
+      const parsed = raw ? JSON.parse(raw) : [];
+      const entry = parsed.find((item) => item.postId === "wp-55") ?? parsed[0] ?? null;
+      return entry ? { anchorId: entry.anchorId, anchorOffset: entry.anchorOffset, scrollTop: entry.scrollTop } : null;
+    });
+    put("storedScroll", stored);
+    check(stored !== null && Math.abs((stored?.scrollTop ?? 0) - scrolled.top) <= 2, "关闭时记录的是文末真实位置", stored);
     const reopened = await openReader(page);
     await page.waitForTimeout(700);
-    const restored = await page.evaluate(readerSnapshot);
+    const restored = await page.evaluate((anchorId) => {
+      const anchor = anchorId ? document.querySelector(`.reader-content [id="${anchorId}"]`) : null;
+      return {
+        scrollTop: document.querySelector(".reader-scroll").scrollTop,
+        anchorTop: anchor ? anchor.offsetTop : null,
+      };
+    }, stored?.anchorId ?? null);
     put("reopened", reopened);
     put("restored", restored);
     await shot("reader-reopened");
-    check(restored.scrollTop >= scrolled.top - 400, "再次打开恢复阅读位置", { restored: restored.scrollTop, expected: scrolled.top });
+    const expectedRestore = restored.anchorTop === null ? null : Math.max(0, restored.anchorTop - (stored?.anchorOffset ?? 0));
+    put("restoreFormula", { expected: expectedRestore, actual: restored.scrollTop, anchorId: stored?.anchorId ?? null });
+    check(
+      restored.scrollTop > 0 && expectedRestore !== null && Math.abs(restored.scrollTop - expectedRestore) <= 24,
+      "再次打开按锚点公式恢复阅读位置",
+      { restored: restored.scrollTop, expected: expectedRestore, anchorId: stored?.anchorId ?? null },
+    );
     equal(await page.evaluate(() => document.querySelectorAll("dialog.article-reader").length), 1, "再次打开复用同一 dialog");
     await closeReaderByEscape(page);
   });
@@ -485,7 +515,9 @@ export async function runInteractionSuite(runtime, { baseUrl, lab }) {
     const expected = restored.anchorTop === null ? null : Math.max(0, Math.min(restored.max, restored.anchorTop - stored[0].anchorOffset));
     put("restoreFormula", { expected, actual: restored.scrollTop, anchorId: stored[0]?.anchorId });
     check(expected !== null && Math.abs(restored.scrollTop - expected) <= 24, "跨槽位按锚点公式恢复位置", { expected, actual: restored.scrollTop });
-    check(restored.scrollTop > restored.max * 0.25, "跨槽位恢复的不是文首", { restored: restored.scrollTop, max: restored.max });
+    // 下面那条锚点公式检查才是主判据；这里只声明「没有回到文首」，
+    // 不对短文章能滚出多少像素作假设（max * 0.25 会随内容长度失守）。
+    check(restored.scrollTop > 0, "跨槽位恢复的不是文首", { restored: restored.scrollTop, max: restored.max });
     await closeReaderByEscape(page);
   });
 

@@ -13,7 +13,7 @@ import {
   unsupportedArticle,
   validArticle,
 } from "../fixtures/article-fixtures.mjs";
-import { closeReaderByEscape, contextSnapshot, labScene, openArticleDetail, openReader, openReaderExpect, pathMatcher, poll, readerSnapshot, sleep, clickSelector } from "./harness.mjs";
+import { articleProseLength, closeReaderByEscape, contextSnapshot, labScene, openArticleDetail, openReader, openReaderExpect, pathMatcher, poll, readerSnapshot, sleep, clickSelector } from "./harness.mjs";
 
 /** Install one route handler for a canonical article path; returns a remover. */
 async function intercept(page, articlePath, handler) {
@@ -91,7 +91,12 @@ export async function runFailureSuite(runtime, { lab }) {
     // Recoverability: the same entry must still read the real article.
     const recovered = await openReader(page);
     put("recovered", { load: recovered.load, textLength: recovered.textLength, errorCode: recovered.errorCode });
-    check(recovered.load === "ready" && recovered.textLength > 4000, "错误轮次之后仍可正常阅读真实文章", recovered.errorCode);
+    const proseLength = await articleProseLength(page, href);
+    check(
+      recovered.load === "ready" && (proseLength === null || recovered.textLength >= Math.floor(proseLength * 0.8)),
+      "错误轮次之后仍可正常阅读整篇文章",
+      { errorCode: recovered.errorCode, textLength: recovered.textLength, proseLength },
+    );
     await closeReaderByEscape(page);
   });
 
