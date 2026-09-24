@@ -20,6 +20,7 @@
     "build:reader-fixtures": "node scripts/reading/fixtures/build-fixture-site.mjs",
     "check:reader-content": "node --experimental-strip-types scripts/reading/verify-content.mjs",
     "check:render-updates": "node --experimental-strip-types scripts/check-render-updates.mjs",
+    "check:motion-preferences": "node --experimental-strip-types scripts/check-motion-preferences.mjs",
     "build:performance": "node scripts/build-performance.mjs",
     "serve:performance": "node scripts/serve-performance.mjs",
     "check:model-precision": "node scripts/check-model-precision-review.mjs",
