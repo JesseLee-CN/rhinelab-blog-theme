@@ -1,11 +1,11 @@
 {
-  "note": "代表路径 fixture。真实内容导入后应随文章更新；包含 200、404 与（S7 后）301/410 期望。",
+  "note": "代表路径 fixture。期望值取自仓库当前的示例内容，运行时先用本地 dist/ 对账，夹具漂移会在本机被拦住而不是等到线上（见 ops/smoke-test.mjs）。真实内容导入后请同步更新本文件。",
   "tests": [
     { "path": "/", "status": 200, "contains": ["最新文章"] },
-    { "path": "/2026/05/13/first-post/", "status": 200, "contains": ["记录一些在电子学习、生活的日常"] },
-    { "path": "/2026/05/13/first-post/", "status": 200 },
-    { "path": "/2026/08/16/sample-tech-note/", "status": 200, "contains": ["git clone https://github.com/example-org/legacy-db-compat-launcher.git"] },
-    { "path": "/about/", "status": 200, "contains": ["谢谢你点进这个页面"] },
+    { "path": "/2026/05/13/first-post/", "status": 200, "contains": ["列表、摘要、RSS、sitemap、搜索索引与三维卡片都由同一份内容派生"] },
+    { "path": "/2026/08/16/sample-tech-note/", "status": 200, "contains": ["某实验软件在一次系统更新后开始稳定抛出三条连续报错"] },
+    { "path": "/about/", "status": 200, "contains": ["这是一个示例独立页面"] },
+    { "path": "/account/", "status": 200, "contains": ["账号"] },
     { "path": "/lab/", "status": 200, "contains": ["RHINE LAB"] },
     { "path": "/rss.xml", "status": 200, "contains": ["<rss"] },
     { "path": "/robots.txt", "status": 200, "contains": ["Sitemap:"] },

@@ -3,7 +3,8 @@
 // 用法：node ops/smoke-test.mjs [baseUrl] [fixture.json]
 // fixture 默认 ops/smoke-fixtures.json。
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = resolve(fileURLToPath(new URL(".", import.meta.url)));
@@ -12,6 +13,62 @@ const fixturePath = resolve(process.argv[3] ?? resolve(here, "smoke-fixtures.jso
 
 const fixtures = JSON.parse(await readFile(fixturePath, "utf8"));
 const failures = [];
+
+// --- 夹具与本地构建对账 ---
+// fixture 的期望值是手写的，过期后过去只能在部署之后才暴露（甚至可能静默变成空检查）。
+// 只要仓库里有 dist/，就先拿本地产物核对一遍：夹具漂移在本机被拦住，不必等到线上。
+// 需要在与本机构建不一致的站点上跑（例如核对一个更旧的 release）时设
+// SMOKE_SKIP_DIST_CHECK=1。
+const distRoot = resolve(here, "../dist");
+
+function distFileFor(requestPath) {
+  const clean = requestPath.split("?")[0].replace(/^\/+|\/+$/g, "");
+  if (clean === "") return join(distRoot, "index.html");
+  if (/\.[a-z0-9]+$/i.test(clean)) return join(distRoot, clean);
+  return join(distRoot, clean, "index.html");
+}
+
+async function reconcileWithDist() {
+  if (process.env.SMOKE_SKIP_DIST_CHECK === "1") return [];
+  if (!existsSync(distRoot)) {
+    console.warn("提示：未找到 dist/，跳过夹具与本地构建的对账，只按夹具访问目标站点。");
+    return [];
+  }
+  const problems = [];
+  for (const test of fixtures.tests) {
+    const file = distFileFor(test.path);
+    let body = null;
+    try {
+      body = await readFile(file, "utf8");
+    } catch {
+      // 本地没有这个产物：对 404 期望是正常的，其余情况在下面对账里报出。
+    }
+    if ((test.status ?? 200) === 404) {
+      if (body !== null) problems.push(`${test.path} 期望 404，但本地产物存在（${file}）`);
+      continue;
+    }
+    if (body === null) {
+      problems.push(`${test.path} 在本地 dist/ 中不存在（${file}）`);
+      continue;
+    }
+    for (const needle of test.contains ?? []) {
+      if (!body.includes(needle)) problems.push(`${test.path} 缺少「${needle}」`);
+    }
+    for (const needle of test.notContains ?? []) {
+      if (body.includes(needle)) problems.push(`${test.path} 不应包含「${needle}」`);
+    }
+  }
+  return problems;
+}
+
+const drift = await reconcileWithDist();
+if (drift.length) {
+  console.error(
+    `smoke 夹具与本地 dist/ 不一致（${drift.length} 项）：\n- ${drift.join("\n- ")}\n` +
+      "请更新 ops/smoke-fixtures.json，或先重新构建 dist/（如需跳过对账：SMOKE_SKIP_DIST_CHECK=1）。",
+  );
+  process.exit(1);
+}
 
 for (const test of fixtures.tests) {
   const url = `${baseUrl}${test.path}`;
