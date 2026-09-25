@@ -22,7 +22,15 @@ const failures = [];
 const distRoot = resolve(here, "../dist");
 
 function distFileFor(requestPath) {
-  const clean = requestPath.split("?")[0].replace(/^\/+|\/+$/g, "");
+  // 线上路径可能带百分号编码（中文 slug），本地产物用的是解码后的目录名，所以先
+  // 解码再映射；解码失败（非法编码）就按原样处理，交给对账去报「本地不存在」。
+  let clean = requestPath.split("?")[0];
+  try {
+    clean = decodeURIComponent(clean);
+  } catch {
+    // 保持原样
+  }
+  clean = clean.replace(/^\/+|\/+$/g, "");
   if (clean === "") return join(distRoot, "index.html");
   if (/\.[a-z0-9]+$/i.test(clean)) return join(distRoot, clean);
   return join(distRoot, clean, "index.html");
