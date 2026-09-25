@@ -26,7 +26,9 @@ const browserArgIndex = process.argv.indexOf("--browser");
 const browserName = browserArgIndex >= 0 ? process.argv[browserArgIndex + 1] : "chromium";
 
 const ADMIN_TOKEN = "local-account-check-admin-token-000000000000";
-const ACCOUNT = { username: "AccountCheckUser", password: "a long enough account password" };
+// The password must satisfy the shared rule: 6-128 code points with an uppercase
+// letter, a lowercase letter and a digit.
+const ACCOUNT = { username: "AccountCheckUser", password: "A long enough account Password 1" };
 
 const checks = [];
 const record = (name, ok, detail) => {
@@ -257,6 +259,24 @@ async function main() {
     record(
       "切回登录后确认密码再次隐藏",
       (await page.evaluate(() => Boolean(document.querySelector("[data-account-confirm]")?.checkVisibility?.() ?? false))) === false,
+    );
+
+    // 页面自带密码显示开关：连续切换必须每次都生效（浏览器自带控件在部分浏览器上
+    // 点开一次后就不再出现）。
+    await page.fill("#account-password", ACCOUNT.password);
+    const revealStates = [];
+    for (let i = 0; i < 4; i += 1) {
+      await page.click("[data-account-reveal='account-password']");
+      revealStates.push(await page.getAttribute("#account-password", "type"));
+    }
+    record(
+      "密码显示开关可反复切换",
+      revealStates.join(",") === "text,password,text,password",
+      revealStates.join(","),
+    );
+    record(
+      "显示密码不丢失输入内容",
+      (await page.inputValue("#account-password")) === ACCOUNT.password,
     );
 
     await page.fill("#account-username", ACCOUNT.username);

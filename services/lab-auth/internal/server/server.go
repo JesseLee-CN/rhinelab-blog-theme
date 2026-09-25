@@ -16,6 +16,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -115,6 +116,9 @@ func New(cfg config.Config, st *store.Store, opts Options) (*Server, error) {
 	}
 	if cfg.RegisterMaxUsers < 1 {
 		cfg.RegisterMaxUsers = 5000
+	}
+	if cfg.ProxyHeader == "" {
+		cfg.ProxyHeader = config.ProxyHeaderRealIP
 	}
 	s := &Server{
 		cfg:            cfg,
@@ -253,14 +257,40 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 
 func (s *Server) withRecover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		guard := &writeGuard{ResponseWriter: w}
 		defer func() {
 			if rec := recover(); rec != nil {
-				s.logger.Error("panic", "request_id", requestID(r), "path", r.URL.Path)
-				writeError(w, http.StatusServiceUnavailable, "unavailable", "服务暂不可用")
+				s.logger.Error("panic",
+					"request_id", requestID(r),
+					"path", r.URL.Path,
+					"error", fmt.Sprint(rec),
+					"stack", string(debug.Stack()))
+				// A reply that already started cannot be amended: appending an error
+				// body would corrupt it, so only the log records the panic.
+				if guard.wrote {
+					return
+				}
+				writeError(guard, http.StatusServiceUnavailable, "unavailable", "服务暂不可用")
 			}
 		}()
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(guard, r)
 	})
+}
+
+// writeGuard remembers whether the response has started.
+type writeGuard struct {
+	http.ResponseWriter
+	wrote bool
+}
+
+func (g *writeGuard) WriteHeader(status int) {
+	g.wrote = true
+	g.ResponseWriter.WriteHeader(status)
+}
+
+func (g *writeGuard) Write(b []byte) (int, error) {
+	g.wrote = true
+	return g.ResponseWriter.Write(b)
 }
 
 // --- helpers ---
@@ -333,25 +363,79 @@ func (s *Server) checkOrigin(r *http.Request) error {
 	return errForbidden
 }
 
-// sourceKey derives the rate-limit identity. X-Forwarded-For is only trusted
-// when the immediate peer is the loopback reverse proxy.
-func sourceKey(r *http.Request) string {
+// peerHost is the immediate peer address with any port removed.
+func peerHost(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		host = r.RemoteAddr
-	}
-	if host == "127.0.0.1" || host == "::1" || host == "localhost" {
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			if first := strings.TrimSpace(strings.Split(xff, ",")[0]); first != "" {
-				return first
-			}
-		}
+		return r.RemoteAddr
 	}
 	return host
 }
 
+// localProxyPeer reports whether the request arrived from the reverse proxy on
+// this host: net/http leaves RemoteAddr empty for an unnamed unix-socket peer,
+// which is exactly how nginx connects in production, and loopback covers a
+// development proxy or a direct local call. No remote peer can satisfy either
+// case, so this is the only place that may unlock a forwarded header.
+func localProxyPeer(r *http.Request) bool {
+	switch peerHost(r) {
+	case "", "@", "127.0.0.1", "::1", "localhost":
+		return true
+	default:
+		return false
+	}
+}
+
+// parseClientIP accepts only a bare IP literal; "1.2.3.4:5678", hostnames and
+// junk are rejected so a malformed header degrades to the peer bucket instead of
+// becoming an attacker-chosen key.
+func parseClientIP(raw string) string {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return ""
+	}
+	ip := net.ParseIP(value)
+	if ip == nil {
+		return ""
+	}
+	return ip.String()
+}
+
+// forwardedClientIP reads the client address reported by the local proxy. For
+// X-Forwarded-For the proxy appends the address it saw, so the right-most entry
+// is the trusted one: every value to its left is client-supplied.
+func forwardedClientIP(header, raw string) string {
+	switch header {
+	case config.ProxyHeaderRealIP:
+		return parseClientIP(raw)
+	case config.ProxyHeaderForwardedFor:
+		parts := strings.Split(raw, ",")
+		for i := len(parts) - 1; i >= 0; i-- {
+			if ip := parseClientIP(parts[i]); ip != "" {
+				return ip
+			}
+		}
+	}
+	return ""
+}
+
+// sourceKey derives the rate-limit identity. The forwarded header is honored
+// only when the immediate peer is the local reverse proxy, and its value must be
+// a well-formed IP address; otherwise the peer address is used, which keeps
+// every unknown caller in one bucket rather than letting them pick a fresh one.
+func (s *Server) sourceKey(r *http.Request) string {
+	peer := peerHost(r)
+	if s.cfg.ProxyHeader == config.ProxyHeaderOff || !localProxyPeer(r) {
+		return peer
+	}
+	if ip := forwardedClientIP(s.cfg.ProxyHeader, r.Header.Get(s.cfg.ProxyHeader)); ip != "" {
+		return ip
+	}
+	return peer
+}
+
 func (s *Server) allowSource(r *http.Request, limit int) bool {
-	return s.source.Allow("src:"+sourceKey(r), limit, time.Minute)
+	return s.source.Allow("src:"+s.sourceKey(r), limit, time.Minute)
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, maxBytes int64, dst any) error {
@@ -389,7 +473,9 @@ func writeError(w http.ResponseWriter, status int, code, message string) {
 	var body apiErrorBody
 	body.Error.Code = code
 	body.Error.Message = message
-	body.RequestID = ""
+	// The middleware already published the id on the response, so the body and
+	// the X-Request-Id header always agree.
+	body.RequestID = w.Header().Get("X-Request-Id")
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
@@ -431,7 +517,26 @@ func (s *Server) authenticate(username, plain string) (store.User, bool, error) 
 	if verifyErr != nil {
 		return store.User{}, false, nil
 	}
+	if ok && password.NeedsRehash(phc, s.cfg.Argon) {
+		// Best effort: the login is already valid, and a failure here only means
+		// the stored hash keeps its older parameters for another round.
+		s.rehashStoredPassword(user.ID, plain)
+	}
 	return user, ok, nil
+}
+
+// rehashStoredPassword upgrades a verified hash to the current Argon2id
+// parameters. NeedsRehash was previously only tested, never wired up, so raising
+// LAB_AUTH_ARGON_* left every existing account on the old work factor.
+func (s *Server) rehashStoredPassword(userID, plain string) {
+	hash, err := password.Hash(plain, s.cfg.Argon)
+	if err != nil {
+		s.logger.Warn("password rehash failed", "error", err.Error())
+		return
+	}
+	if err := s.st.RefreshPasswordHash(userID, hash); err != nil {
+		s.logger.Warn("password rehash not stored", "error", err.Error())
+	}
 }
 
 // --- handlers ---
@@ -611,7 +716,7 @@ func (s *Server) handleConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	now := s.nowUnix()
-	result, err := s.st.ConfirmAttempt(r.Context(), body.AttemptID, now, now+seconds(s.cfg.SessionIdle), now+seconds(s.cfg.SessionAbsolute))
+	result, err := s.st.ConfirmAttempt(r.Context(), body.AttemptID, flow.ID, now, now+seconds(s.cfg.SessionIdle), now+seconds(s.cfg.SessionAbsolute))
 	switch {
 	case errors.Is(err, store.ErrUnauthenticated), errors.Is(err, store.ErrNotFound):
 		writeError(w, http.StatusUnauthorized, "invalid_credentials", "会话未确认")
@@ -639,6 +744,13 @@ type sessionResponse struct {
 }
 
 func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
+	// A session read costs a query, and a live session also refreshes its idle
+	// deadline, so anonymous callers must not be able to hammer it. The factor is
+	// generous because every page load legitimately asks once.
+	if !s.allowSource(r, s.cfg.SourceRatePerMin*6) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "请求过于频繁")
+		return
+	}
 	token := cookieValue(r, sessionCookie)
 	if token == "" {
 		writeJSON(w, http.StatusOK, sessionResponse{Authenticated: false})
@@ -681,7 +793,7 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 		s.writeBodyError(w, err)
 		return
 	}
-	if err := s.st.CancelAttempt(r.Context(), body.AttemptID, s.nowUnix()); err != nil {
+	if err := s.st.CancelAttempt(r.Context(), body.AttemptID, flow.ID, s.nowUnix()); err != nil {
 		writeError(w, http.StatusServiceUnavailable, "unavailable", "服务暂不可用")
 		return
 	}

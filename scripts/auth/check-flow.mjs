@@ -270,7 +270,7 @@ try {
 
       await waitVisible(page, '#boot-entry[data-phase="login"]');
       await fill(page, "#entry-username", user);
-      await fill(page, "#entry-password", "definitely not the password");
+      await fill(page, "#entry-password", "Definitely not the password 1");
       await click(page, "#entry-submit");
       await waitFor(page, () => document.querySelector("#boot-entry")?.classList.contains("has-error"));
       check("wrong password keeps username", (await inputValue(page, "#entry-username")) === user);

@@ -2,6 +2,7 @@ package store
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -61,7 +62,7 @@ func TestSchemaChecksumMismatchFails(t *testing.T) {
 
 func TestCreateAndAuthenticate(t *testing.T) {
 	s := openTest(t)
-	user, err := s.CreateUser("JOYCE_01", "a very long password")
+	user, err := s.CreateUser("JOYCE_01", "A very long password 1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +76,7 @@ func TestCreateAndAuthenticate(t *testing.T) {
 	if stored.ID != user.ID {
 		t.Fatalf("lookup by different case returned %s, want %s", stored.ID, user.ID)
 	}
-	if ok, _ := password.Verify("a very long password", phc); !ok {
+	if ok, _ := password.Verify("A very long password 1", phc); !ok {
 		t.Fatal("correct password should verify")
 	}
 	if ok, _ := password.Verify("wrong password", phc); ok {
@@ -88,26 +89,26 @@ func TestCreateAndAuthenticate(t *testing.T) {
 
 func TestDuplicateAndReservedAndInvalid(t *testing.T) {
 	s := openTest(t)
-	if _, err := s.CreateUser("joyce", "a very long password"); err != nil {
+	if _, err := s.CreateUser("joyce", "A very long password 1"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateUser("JOYCE", "another long password"); !errors.Is(err, ErrUsernameTaken) {
+	if _, err := s.CreateUser("JOYCE", "Another long password 1"); !errors.Is(err, ErrUsernameTaken) {
 		t.Fatalf("case-insensitive duplicate: got %v", err)
 	}
-	if _, err := s.CreateUser("guest", "a very long password"); !errors.Is(err, ErrInvalidUsername) {
+	if _, err := s.CreateUser("guest", "A very long password 1"); !errors.Is(err, ErrInvalidUsername) {
 		t.Fatalf("reserved name: got %v", err)
 	}
 	if _, err := s.CreateUser("validname", "short"); !errors.Is(err, ErrInvalidPassword) {
 		t.Fatalf("short password: got %v", err)
 	}
-	if _, err := s.CreateUser("no", "a very long password"); !errors.Is(err, ErrInvalidUsername) {
+	if _, err := s.CreateUser("no", "A very long password 1"); !errors.Is(err, ErrInvalidUsername) {
 		t.Fatalf("short username: got %v", err)
 	}
 }
 
 func TestSetEnabledBumpsVersion(t *testing.T) {
 	s := openTest(t)
-	if _, err := s.CreateUser("toggle", "a very long password"); err != nil {
+	if _, err := s.CreateUser("toggle", "A very long password 1"); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.SetEnabled("toggle", false); err != nil {
@@ -130,7 +131,7 @@ func TestSetEnabledBumpsVersion(t *testing.T) {
 
 func TestResetPasswordRevokesSessions(t *testing.T) {
 	s := openTest(t)
-	user, err := s.CreateUser("resetme", "old password value")
+	user, err := s.CreateUser("resetme", "Old password value 1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,17 +140,17 @@ func TestResetPasswordRevokesSessions(t *testing.T) {
 		 VALUES('s1','t1',?,'active',1,'c1',0,0,0,0)`, user.ID); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.ResetPassword("resetme", "new password value"); err != nil {
+	if err := s.ResetPassword("resetme", "New password value 1"); err != nil {
 		t.Fatal(err)
 	}
 	_, phc, err := s.GetUserByKey("resetme")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if ok, _ := password.Verify("old password value", phc); ok {
+	if ok, _ := password.Verify("Old password value 1", phc); ok {
 		t.Fatal("old password must stop working after reset")
 	}
-	if ok, _ := password.Verify("new password value", phc); !ok {
+	if ok, _ := password.Verify("New password value 1", phc); !ok {
 		t.Fatal("new password must verify")
 	}
 	var state string
@@ -158,6 +159,65 @@ func TestResetPasswordRevokesSessions(t *testing.T) {
 	}
 	if state != "revoked" {
 		t.Fatalf("session state = %q, want revoked", state)
+	}
+}
+
+// insertActiveSession seeds one live session row directly, so the test targets
+// the revocation path instead of the login flow.
+func insertActiveSession(t *testing.T, s *Store, id string, user User) {
+	t.Helper()
+	if _, err := s.db.Exec(
+		`INSERT INTO sessions(session_id, token_hash, user_id, state, credential_version, csrf_hash, idle_expires_at, absolute_expires_at, created_at, last_seen_at)
+		 VALUES(?, ?, ?,'active',1,?,0,0,0,0)`, id, "t_"+id, user.ID, "c_"+id); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func sessionState(t *testing.T, s *Store, id string) string {
+	t.Helper()
+	var state string
+	if err := s.db.QueryRow(`SELECT state FROM sessions WHERE session_id = ?`, id).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	return state
+}
+
+// TestDisableRevokesSessions pins that disabling an account ends its sessions
+// immediately. Bumping the credential version alone only invalidates them on
+// first use, which leaves `session list` showing live sessions for a disabled
+// account right after the operator asked for them to be revoked.
+func TestDisableRevokesSessions(t *testing.T) {
+	s := openTest(t)
+	user, err := s.CreateUser("disableme", "A very long password 1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	insertActiveSession(t, s, "s_disable", user)
+	if err := s.SetEnabled("disableme", false); err != nil {
+		t.Fatal(err)
+	}
+	if state := sessionState(t, s, "s_disable"); state != "revoked" {
+		t.Fatalf("session state = %q, want revoked", state)
+	}
+}
+
+// TestBackupIsOwnerOnly keeps the snapshot from inheriting a world-readable
+// umask: the file carries password hashes and session digests.
+func TestBackupIsOwnerOnly(t *testing.T) {
+	s := openTest(t)
+	if _, err := s.CreateUser("backupme", "A very long password 1"); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(t.TempDir(), "snapshot.db")
+	if err := s.Backup(dest); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Fatalf("backup mode = %o, want 600", perm)
 	}
 }
 
@@ -186,7 +246,7 @@ func TestReopenPersistsUsersAndFlows(t *testing.T) {
 	if err := s.Migrate(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := s.CreateUser("Persisted", "a very long password"); err != nil {
+	if _, err := s.CreateUser("Persisted", "A very long password 1"); err != nil {
 		t.Fatal(err)
 	}
 	flowID, err := NewID("f_", 16)
@@ -271,7 +331,7 @@ func TestCleanupExpiresFlowsAndAttempts(t *testing.T) {
 
 func TestBackupRestoreRevokesSessions(t *testing.T) {
 	s := openTest(t)
-	user, err := s.CreateUser("backupuser", "a very long password")
+	user, err := s.CreateUser("backupuser", "A very long password 1")
 	if err != nil {
 		t.Fatal(err)
 	}

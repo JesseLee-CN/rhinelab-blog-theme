@@ -216,9 +216,10 @@ type ConfirmedResult struct {
 	SessionExpiresAt int64
 }
 
-// ConfirmAttempt activates the pending session. It re-checks expiry, account
-// state and credential version so a disable/reset during verification aborts.
-func (s *Store) ConfirmAttempt(ctx context.Context, attemptID string, now, idleExpiresAt, absoluteExpiresAt int64) (ConfirmedResult, error) {
+// ConfirmAttempt activates the pending session. It only confirms an attempt that
+// belongs to the caller's own flow, and re-checks expiry, account state and
+// credential version so a disable/reset during verification aborts.
+func (s *Store) ConfirmAttempt(ctx context.Context, attemptID, flowID string, now, idleExpiresAt, absoluteExpiresAt int64) (ConfirmedResult, error) {
 	var result ConfirmedResult
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		attempt, err := scanAttempt(tx.QueryRow(`SELECT `+attemptColumns+` FROM login_attempts WHERE attempt_id = ?`, attemptID))
@@ -227,6 +228,11 @@ func (s *Store) ConfirmAttempt(ctx context.Context, attemptID string, now, idleE
 		}
 		if err != nil {
 			return err
+		}
+		if attempt.FlowID != flowID {
+			// Another flow's attempt is reported as absent: confirming it on the
+			// caller's behalf would hand them a session they never verified.
+			return ErrNotFound
 		}
 		if attempt.State != "pending" {
 			return ErrStateConflict
@@ -277,9 +283,10 @@ func (s *Store) ConfirmAttempt(ctx context.Context, attemptID string, now, idleE
 }
 
 // CancelAttempt cancels a pending attempt and revokes the session it issued, or
-// revokes the active session when the attempt was already confirmed. It is
-// idempotent and never touches other attempts.
-func (s *Store) CancelAttempt(ctx context.Context, attemptID string, now int64) error {
+// revokes the active session when the attempt was already confirmed. It only
+// touches attempts of the caller's own flow, is idempotent, and a foreign
+// attempt is a silent no-op so the endpoint cannot be used to probe login state.
+func (s *Store) CancelAttempt(ctx context.Context, attemptID, flowID string, now int64) error {
 	return s.withTx(ctx, func(tx *sql.Tx) error {
 		attempt, err := scanAttempt(tx.QueryRow(`SELECT `+attemptColumns+` FROM login_attempts WHERE attempt_id = ?`, attemptID))
 		if errors.Is(err, sql.ErrNoRows) {
@@ -287,6 +294,9 @@ func (s *Store) CancelAttempt(ctx context.Context, attemptID string, now int64) 
 		}
 		if err != nil {
 			return err
+		}
+		if attempt.FlowID != flowID {
+			return nil
 		}
 		switch attempt.State {
 		case "issued", "verifying", "pending":

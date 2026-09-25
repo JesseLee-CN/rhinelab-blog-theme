@@ -100,7 +100,7 @@ func TestRegisterDuplicateKeepsExistingPassword(t *testing.T) {
 	// duplicate case the contract talks about. "joycemoore" would be a different
 	// account (separators are significant), which is what the earlier version of
 	// this test got wrong.
-	res := e.register(c, csrf, "joyce_moore", "another long password")
+	res := e.register(c, csrf, "joyce_moore", "Another long password 1")
 	if res.status != http.StatusConflict || errorCode(t, res) != "registration_unavailable" {
 		t.Fatalf("status=%d body=%s", res.status, res.body)
 	}

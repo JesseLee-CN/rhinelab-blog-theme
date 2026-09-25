@@ -9,7 +9,7 @@ import "strings"
 const (
 	UsernameMin = 3
 	UsernameMax = 24
-	PasswordMin = 15
+	PasswordMin = 6
 	PasswordMax = 128
 )
 
@@ -77,6 +77,11 @@ type PasswordError string
 const (
 	PasswordTooShort PasswordError = "too-short"
 	PasswordTooLong  PasswordError = "too-long"
+	// PasswordWeak means the value is long enough but misses a required character
+	// class: at least one ASCII uppercase letter, one ASCII lowercase letter and
+	// one ASCII digit. Classification is ASCII on purpose, matching the username
+	// charset, so both implementations agree without Unicode case folding.
+	PasswordWeak PasswordError = "weak"
 )
 
 // ValidatePassword counts code points; it never trims or normalises.
@@ -87,6 +92,20 @@ func ValidatePassword(value string) PasswordError {
 	}
 	if length > PasswordMax {
 		return PasswordTooLong
+	}
+	var upper, lower, digit bool
+	for _, r := range value {
+		switch {
+		case r >= 'A' && r <= 'Z':
+			upper = true
+		case r >= 'a' && r <= 'z':
+			lower = true
+		case r >= '0' && r <= '9':
+			digit = true
+		}
+	}
+	if !upper || !lower || !digit {
+		return PasswordWeak
 	}
 	return ""
 }

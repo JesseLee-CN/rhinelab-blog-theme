@@ -27,7 +27,7 @@ func openRegistrationStore(t *testing.T) (*Store, string) {
 
 func registerInput(t *testing.T, username, source string, sourceLimit, globalLimit, maxUsers int) RegistrationInput {
 	t.Helper()
-	hash, err := password.Hash("a very long password", testArgon())
+	hash, err := password.Hash("A very long password 1", testArgon())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestRegisterUserCreatesAndPersists(t *testing.T) {
 	if err != nil || got.ID != user.ID {
 		t.Fatalf("reopen lookup: %v %+v", err, got)
 	}
-	ok, err := password.Verify("a very long password", phc)
+	ok, err := password.Verify("A very long password 1", phc)
 	if err != nil || !ok {
 		t.Fatalf("stored password does not verify: %v %v", ok, err)
 	}
@@ -108,7 +108,7 @@ func TestRegisterUserGlobalQuota(t *testing.T) {
 
 func TestRegisterUserCapAndUnique(t *testing.T) {
 	s, _ := openRegistrationStore(t)
-	if _, err := s.CreateUser("Existing", "a very long password"); err != nil {
+	if _, err := s.CreateUser("Existing", "A very long password 1"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := s.RegisterUser(registerInput(t, "OverCap", "digest-f", 10, 200, 1)); !errors.Is(err, ErrUserLimit) {
@@ -216,7 +216,7 @@ func TestRegisterUserSurvivesBackupRestore(t *testing.T) {
 	if err != nil || got.ID != user.ID {
 		t.Fatalf("restored lookup: %v %+v", err, got)
 	}
-	ok, err := password.Verify("a very long password", phc)
+	ok, err := password.Verify("A very long password 1", phc)
 	if err != nil || !ok {
 		t.Fatalf("registered password must survive restore: ok=%v err=%v", ok, err)
 	}

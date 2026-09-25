@@ -89,6 +89,38 @@ func TestUnknownEnvRejected(t *testing.T) {
 	}
 }
 
+func TestProxyHeaderDefaultsAndOverrides(t *testing.T) {
+	base := map[string]string{"LAB_AUTH_LISTEN": "127.0.0.1:8081", "LAB_AUTH_DB": "/tmp/auth.db"}
+	if cfg := mustLoad(t, base); cfg.ProxyHeader != ProxyHeaderRealIP {
+		t.Fatalf("default proxy header = %q, want %q", cfg.ProxyHeader, ProxyHeaderRealIP)
+	}
+
+	for _, tc := range []struct{ env, want string }{
+		{"X-Forwarded-For", ProxyHeaderForwardedFor},
+		{"x-real-ip", ProxyHeaderRealIP},
+		{"OFF", ProxyHeaderOff},
+		{"none", ProxyHeaderOff},
+	} {
+		values := clone(base)
+		values["LAB_AUTH_PROXY_HEADER"] = tc.env
+		cfg := mustLoad(t, values)
+		if cfg.ProxyHeader != tc.want {
+			t.Fatalf("LAB_AUTH_PROXY_HEADER=%q -> %q, want %q", tc.env, cfg.ProxyHeader, tc.want)
+		}
+		if err := cfg.Validate(); err != nil {
+			t.Fatalf("LAB_AUTH_PROXY_HEADER=%q rejected: %v", tc.env, err)
+		}
+	}
+
+	// An unknown header name must fail closed instead of silently disabling the
+	// source split or, worse, trusting an unvetted header.
+	bad := clone(base)
+	bad["LAB_AUTH_PROXY_HEADER"] = "x-client-ip"
+	if err := mustLoad(t, bad).Validate(); err == nil {
+		t.Fatal("unknown proxy header must fail validation")
+	}
+}
+
 func TestRegistrationDefaultsAndOverrides(t *testing.T) {
 	base := map[string]string{"LAB_AUTH_LISTEN": "127.0.0.1:8081", "LAB_AUTH_DB": "/tmp/auth.db"}
 	cfg := mustLoad(t, base)

@@ -21,6 +21,10 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
+// passwordRuleMessage is the single user-facing wording for the shared password
+// rule (mirrored in src/features/auth/panel.ts and the blog account page).
+const passwordRuleMessage = "密码需为 6–128 个字符，且至少包含一个大写字母、一个小写字母和一个数字"
+
 type registerResponse struct {
 	Registered bool        `json:"registered"`
 	User       userPayload `json:"user"`
@@ -68,7 +72,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if perr := identity.ValidatePassword(body.Password); perr != "" {
-		writeError(w, http.StatusBadRequest, "bad_request", "密码长度需为 15–128 个字符")
+		writeError(w, http.StatusBadRequest, "bad_request", passwordRuleMessage)
 		return
 	}
 	input := store.RegistrationInput{
@@ -136,7 +140,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 // registerSourceDigest derives a stable, non-reversible source key. IPv4 is
 // keyed by address and IPv6 by /64, matching CONTRACT §11.
 func (s *Server) registerSourceDigest(r *http.Request) string {
-	host := aggregateSourceIP(sourceKey(r))
+	host := aggregateSourceIP(s.sourceKey(r))
 	mac := hmac.New(sha256.New, s.cfg.CSRFSecret)
 	mac.Write([]byte("register-source:"))
 	mac.Write([]byte(host))

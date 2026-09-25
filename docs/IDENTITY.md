@@ -29,7 +29,7 @@
 | 唯一键 | ASCII 小写（`usernameKey`）；大小写冲突由唯一约束拒绝 |
 | 保留名 | `guest`（小写比较）不可注册 |
 | 展示值 | 大写，形如 `ID CONFIRMED : <LABEL>` |
-| 密码长度 | 15–128 个 Unicode 码点 |
+| 密码长度 | 6–128 个 Unicode 码点，且至少包含一个 ASCII 大写字母、一个小写字母和一个数字 |
 | 密码处理 | 原样 UTF-8 字节校验，**不 trim、不归一化、不截断**；允许空格与粘贴 |
 | 散列 | Argon2id，19 MiB / 迭代 2 / 并行度 1；并发 2、队列 8 |
 
@@ -76,10 +76,16 @@ ready 之前表单为 inert；登录页按 `Esc` 取消进行中的登录并留�
 | 会话 Cookie | `__Host-lab-session`：`Secure; HttpOnly; SameSite=Lax; Path=/`，无 `Domain` |
 | Flow Cookie | `__Host-lab-flow`：同上，用于预认证取消 |
 | CSRF | 绑定 flow 或当前会话，走 `X-CSRF-Token` 头；不放 URL、不记日志 |
-| Origin | 精确允许列表；POST 同时校验 Origin 与 Fetch Metadata；只信任本机代理传来的真实源地址 |
+| Origin | 精确允许列表；POST 同时校验 Origin 与 Fetch Metadata；来源地址只在本机代理转发时才取指定请求头（见 §6 来源识别） |
 
 会话 Cookie 是**持久 Cookie**：默认 30 分钟空闲过期、12 小时绝对过期。前端加载时查询 `/session`，
 仍有效时在登录面板显示 `CONTINUE AS <用户名>` 并预填用户名；登出会同时清除服务端会话与 Cookie。
+
+**CSRF 令牌的取舍**：flow 与 session 的令牌都是 `HMAC(CSRF 密钥, scope + 公开 ID)` 的确定性结果，
+会话内不轮换，服务端因此无需为每个令牌保存额外状态。代价是密钥泄露即等于可为任意 flow/session
+伪造令牌；跨站风险由三点挡住：令牌只出现在同源响应的 JSON 里（不写 Cookie、不放 URL）、全部响应
+`no-store`、服务不返回任何 CORS 头。轮换 `LAB_AUTH_CSRF_SECRET` 会让在途令牌立即失效，客户端重新
+查询 `/session` 即可继续。
 
 ## 6. 数据与超时
 
@@ -93,10 +99,19 @@ ready 之前表单为 inert；登录页按 `Esc` 取消进行中的登录并留�
 | pending 未确认 | 60 秒 |
 | 预认证 flow | 10 分钟 |
 | 请求体上限 | 4 KiB |
-| 来源限流 | 每分钟 10 次、burst 3 |
+| 来源限流 | 每分钟 10 次、burst 3（按来源分桶，见下） |
 | 用户名限流 | 15 分钟内 5 次失败后进入退避 |
 | 每 flow 未结束 attempt | ≤ 4 |
 | 注册额度 | 来源 10/小时、全站 200/日、账号上限 5000 |
+
+**来源识别**：限流的"来源"取 `LAB_AUTH_PROXY_HEADER`（默认 `x-real-ip`）指定的头，且**只有直连
+对端是本机反向代理时**才读取——生产是 nginx 经 unix socket 连接（`RemoteAddr` 为空），开发是
+回环地址，其余对端一律用对端地址本身。头值必须是纯 IP 字面量（带端口、主机名或非法值一律忽略
+并退回对端地址）；`x-forwarded-for` 只取最右一段。因此外部客户端无法通过伪造请求头为自己换一个
+限流桶，也无法让自己影响别人的桶。nginx 片段用 `$remote_addr` 覆盖写入这两个头；把
+`LAB_AUTH_PROXY_HEADER` 配成 `off` 则所有请求共用一个桶（仅排查用）。
+`/session` 的额度是来源限流的 6 倍（默认 60 次/分钟/来源），因为每次页面加载都会查询一次登录态；
+`/login` 与 `/csrf` 分别是 1 倍与 3 倍。
 
 注册默认**关闭**（`LAB_AUTH_REGISTRATION_ENABLED=0`）；开启后 `register:` 命名空间与登录限流相互独立。
 注册的 `201` 与 `409` 差异仍允许探测某个用户名是否可用——已用统一失败文案、限流与不返回既有账号
@@ -142,6 +157,9 @@ ready 之前表单为 inert；登录页按 `Esc` 取消进行中的登录并留�
   不会退化成无鉴权接口。令牌至少 32 字符，恒定时间比较，缺失/错误统一 401。
 - 接口**只认 Bearer 令牌、不读 Cookie**，因此浏览器会话或 XSS 都无法调用管理面，
   也不存在 CSRF 面；请求按来源限流。
+- 限流在**令牌校验之前**扣除：错误或缺失的令牌同样消耗额度，失败尝试写日志但不写审计
+  （审计表只增不删，未认证请求不能往里写）。`ops/nginx/auth-location.conf` 默认对管理前缀
+  返回 404，管理面不在公网可达范围内。
 - 每次变更写一条审计（actor `admin-api`；CLI 写 `cli:<系统用户>`，动作
   `user.create|enable|disable|password|delete`、`session.revoke`）。审计表只增不改，
   删除账号不删除其审计记录。
@@ -200,6 +218,8 @@ npm run test:packaging    # 打包与配对（需要 Go 工具链构建二进制
 重复迁移、隔离备份恢复、账号删除的连带行与最后一个账号保护、审计流水、管理接口的
 令牌与禁用分支，以及 CLI 不回显密码。测试账号应随机生成且只写入隔离数据库——
 **源码与文档里不放长期凭据**。
+端到端脚本用的测试口令（`E2E_PASSWORD`）同样要满足当前口令规则（6–128 码点，且含大写
+字母、小写字母与数字），否则脚本会停在建号那一步。
 
 ## 12. 相关文档
 

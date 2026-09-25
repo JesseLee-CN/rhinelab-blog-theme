@@ -225,7 +225,7 @@ async function scenarioFull() {
 
   const third = await openContext({ reducedMotion: "reduce", viewport: { width: 1280, height: 800 } });
   await openRegister(third.page);
-  await submitRegister(third.page, newUser, "another password value 42");
+  await submitRegister(third.page, newUser, "Another password value 42");
   check("duplicate register is rejected", (await registerOutcome(third.page)) === "error");
   check("duplicate register says unavailable", ((await text(third.page, "#entry-error")) ?? "").includes("该用户名不可用"));
   check("duplicate register sets no session", !(await hasSessionCookie(third.context)));

@@ -30,6 +30,8 @@
 
 .entry-field {
   display: grid;
+  /* 标题行右侧可以放"显示/隐藏密码"开关；输入框跨两列占满整行。 */
+  grid-template-columns: 1fr auto;
   gap: 6px;
   margin-bottom: 12px;
 }
@@ -39,6 +41,8 @@
 }
 
 .entry-label {
+  grid-column: 1;
+  grid-row: 1;
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.4px;
@@ -46,6 +50,8 @@
 }
 
 .entry-field input {
+  grid-column: 1 / -1;
+  grid-row: 2;
   width: 100%;
   min-height: 26px;
   padding: 2px 0 4px;
@@ -66,6 +72,46 @@
 .entry-field input:focus-visible {
   outline: 2px solid #151713;
   outline-offset: 2px;
+}
+
+/* 面板自带的密码显示开关。浏览器自带的那个各浏览器行为不一致（有的用一次就消失），
+   这里给一个稳定的替代，字号与 .entry-link 一致但更轻。 */
+.entry-reveal {
+  /* 与字段标题同一行：显式定位，避免自动排布把它挤到输入框下面。 */
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  min-height: 24px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  /* 跟随面板文字色：深色模式下由 theme.css 接管（原先写死近黑色，在暗色幕布上
+     几乎看不见）。 */
+  color: inherit;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.entry-reveal:hover {
+  opacity: 1;
+}
+
+.entry-reveal:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+/* 浏览器自带的密码显示控件（Edge / IE 的 ::-ms-reveal）和面板自己的开关重复，
+   而且它的行为不可控（有的浏览器点开一次后就不再出现）：统一隐藏。
+   Chromium / Safari 的原生控件没有公开的样式钩子，只能保留。 */
+.entry-field input[type="password"]::-ms-reveal,
+.entry-field input[type="password"]::-ms-clear {
+  display: none;
 }
 
 .entry-error {

@@ -20,7 +20,7 @@ func TestCLICreateListNeverLeaksPassword(t *testing.T) {
 	if _, _, err := runCLI(t, []string{"migrate", "-db", db}, ""); err != nil {
 		t.Fatal(err)
 	}
-	password := "a top secret long password"
+	password := "A top secret long password 1"
 	out, _, err := runCLI(t, []string{"user", "create", "-db", db, "TestUser"}, password+"\n"+password+"\n")
 	if err != nil {
 		t.Fatalf("create: %v", err)

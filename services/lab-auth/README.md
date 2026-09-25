@@ -48,6 +48,7 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o ../../.tools/boot-id
 | `LAB_AUTH_PENDING_TTL` / `LAB_AUTH_FLOW_TTL` | Go duration |
 | `LAB_AUTH_CSRF_SECRET` | 32 字节 hex；生产必填，供 flow/session CSRF 与注册来源 HMAC 派生 |
 | `LAB_AUTH_COOKIE_INSECURE` | `1` 时关闭 Cookie Secure（仅本地 http 调试） |
+| `LAB_AUTH_PROXY_HEADER` | 反代报告客户端地址用的头：`x-real-ip`（默认）/ `x-forwarded-for` / `off` |
 | `LAB_AUTH_REGISTRATION_ENABLED` | 默认 false；`1`/`true` 开放 register-v1 |
 | `LAB_AUTH_REGISTER_SOURCE_HOURLY` | 每来源每小时注册尝试（默认 10，持久额度） |
 | `LAB_AUTH_REGISTER_GLOBAL_DAILY` | 全站每日注册尝试（默认 200，持久额度） |
@@ -57,6 +58,18 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o ../../.tools/boot-id
 
 生产缺少关键配置时 `Validate()` 拒绝启动，默认不监听公网。真实配置放
 `ops/auth/*.env`（Git 忽略），仓库只保留示例。
+
+### 来源识别与限流键
+
+限流按来源分桶，来源由 `LAB_AUTH_PROXY_HEADER` 指定的头决定，但**只有直连对端是本机代理时
+才读该头**：生产是 nginx 经 unix socket 连接（此时 `RemoteAddr` 为空），开发是回环地址。
+其它对端一律使用对端地址本身，因此外部客户端无法靠伪造请求头给自己换一个限流桶。
+
+- 取到的值必须是纯 IP 字面量（`1.2.3.4`、`2001:db8::1`）；带端口、主机名或非法值的头
+  一律忽略并退回对端地址，宁可共用桶也不接受可疑输入。
+- `x-forwarded-for` 只取**最右一段**：本仓库的 nginx 片段用 `$remote_addr` 覆盖写入，
+  客户端自带的值不会被追加进信任范围。
+- `LAB_AUTH_PROXY_HEADER=off` 关闭该机制，所有请求共用一个桶（仅排查用）。
 
 ## HTTP 服务
 
@@ -103,8 +116,10 @@ lab-auth serve [-insecure-cookies]
   也没有 CSRF 令牌要求。令牌比较恒定时间，缺失/错误统一 401，不区分原因。
 - 每个变更写一条审计（actor `admin-api`）；CLI 写 `cli:<系统用户>`。审计表只增不改，
   删除账号不会删除它的审计记录（记录里存的是用户名）。
-- 按来源限流（`LAB_AUTH_ADMIN_RATE`，默认每分钟 60）。
-- 建议在 Nginx 层再限制或仅对内网开放 `/api/auth/admin/`；服务本身不区分来源网段。
+- 按来源限流（`LAB_AUTH_ADMIN_RATE`，默认每分钟 60），**令牌校验之前**先扣额度，因此错误令牌
+  的尝试同样受限；失败只写日志、不写审计（审计表只增不删，不能让未认证的请求往里写）。
+- `ops/nginx/auth-location.conf` 默认对 `/…/admin/` 返回 404：管理面不挂公网。需要远程操作时，
+  用更精确的 location 按网段放行，或走内网监听 / ssh 隧道；服务本身不区分来源网段。
 
 ## CLI
 

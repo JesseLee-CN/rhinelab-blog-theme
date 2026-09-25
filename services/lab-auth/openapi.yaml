@@ -473,7 +473,7 @@ components:
         attemptId: { type: string }
         username: { type: string, minLength: 3, maxLength: 24 }
         password:
-          { type: string, description: 15-128 Unicode code points; sent as-is }
+          { type: string, description: 6-128 Unicode code points, with at least one ASCII uppercase letter, one lowercase letter and one digit; sent as-is }
     LoginResponse:
       type: object
       required: [pending, user, attemptId]
@@ -500,7 +500,7 @@ components:
       properties:
         username: { type: string, minLength: 3, maxLength: 24 }
         password:
-          { type: string, description: 15-128 Unicode code points; sent as-is }
+          { type: string, description: 6-128 Unicode code points, with at least one ASCII uppercase letter, one lowercase letter and one digit; sent as-is }
     RegisterResponse:
       type: object
       required: [registered, user]

@@ -15,7 +15,7 @@ export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 24;
 export const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
 export const RESERVED_USERNAME_KEYS: readonly string[] = ["guest"];
-export const PASSWORD_MIN = 15;
+export const PASSWORD_MIN = 6;
 export const PASSWORD_MAX = 128;
 
 export type IdentityKind = "none" | "guest" | "registered";
@@ -42,7 +42,14 @@ export type BootIdentity = NoIdentity | GuestIdentity | RegisteredIdentity;
 export type ChosenIdentity = GuestIdentity | RegisteredIdentity;
 
 export type UsernameError = "too-short" | "too-long" | "charset" | "reserved";
-export type PasswordError = "too-short" | "too-long";
+/**
+ * "weak" means the value is long enough but misses a required character class:
+ * at least one ASCII uppercase letter, one ASCII lowercase letter and one ASCII
+ * digit. Classification is ASCII on purpose, matching the username charset, so
+ * this file and services/lab-auth/internal/identity agree without Unicode case
+ * folding.
+ */
+export type PasswordError = "too-short" | "too-long" | "weak";
 
 export interface ValidUsername {
   readonly ok: true;
@@ -92,6 +99,15 @@ export function validatePassword(value: string): PasswordResult {
   const length = passwordCodePoints(value);
   if (length < PASSWORD_MIN) return { ok: false, error: "too-short" };
   if (length > PASSWORD_MAX) return { ok: false, error: "too-long" };
+  let upper = false;
+  let lower = false;
+  let digit = false;
+  for (const char of value) {
+    if (char >= "A" && char <= "Z") upper = true;
+    else if (char >= "a" && char <= "z") lower = true;
+    else if (char >= "0" && char <= "9") digit = true;
+  }
+  if (!upper || !lower || !digit) return { ok: false, error: "weak" };
   return { ok: true };
 }
 

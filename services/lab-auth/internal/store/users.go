@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -108,22 +109,30 @@ func (s *Store) ListUsers() ([]User, error) {
 	return users, rows.Err()
 }
 
-// SetEnabled toggles an account and, per contract, bumps the credential version
-// and revokes that user's sessions.
+// SetEnabled toggles an account, bumps the credential version and revokes its
+// sessions in one transaction. Revoking explicitly (rather than relying on the
+// version bump) matters because the bump only invalidates a session on its next
+// use: until then the session list still shows it as active.
 func (s *Store) SetEnabled(key string, enabled bool) error {
 	return s.mutateUser(key, func(userID string) error {
 		flag := 0
 		if enabled {
 			flag = 1
 		}
-		res, err := s.db.Exec(
-			`UPDATE users SET enabled = ?, credential_version = credential_version + 1, updated_at = ? WHERE user_id = ?`,
-			flag, s.now(), userID,
-		)
-		if err != nil {
+		return s.withTx(context.Background(), func(tx *sql.Tx) error {
+			res, err := tx.Exec(
+				`UPDATE users SET enabled = ?, credential_version = credential_version + 1, updated_at = ? WHERE user_id = ?`,
+				flag, s.now(), userID,
+			)
+			if err != nil {
+				return err
+			}
+			if err := expectOne(res); err != nil {
+				return err
+			}
+			_, err = tx.Exec(`UPDATE sessions SET state = 'revoked' WHERE user_id = ? AND state != 'revoked'`, userID)
 			return err
-		}
-		return expectOne(res)
+		})
 	})
 }
 
@@ -159,6 +168,23 @@ func (s *Store) mutateUser(key string, fn func(userID string) error) error {
 		return err
 	}
 	return fn(user.ID)
+}
+
+// RefreshPasswordHash replaces the stored hash without touching the credential
+// version. It runs immediately after a successful verification, and bumping the
+// version there would cancel the session that login is about to create.
+func (s *Store) RefreshPasswordHash(userID, phc string) error {
+	if strings.TrimSpace(phc) == "" {
+		return errors.New("store: empty password hash")
+	}
+	res, err := s.db.Exec(
+		`UPDATE users SET password_hash = ?, updated_at = ? WHERE user_id = ?`,
+		phc, s.now(), userID,
+	)
+	if err != nil {
+		return err
+	}
+	return expectOne(res)
 }
 
 // RevokeSessions revokes every session of one user.

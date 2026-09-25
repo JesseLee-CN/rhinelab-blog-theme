@@ -21,6 +21,15 @@ const (
 	Production  Env = "production"
 )
 
+// ProxyHeader values. A forwarded client address is only ever read from the
+// local reverse proxy (see server.sourceKey); "off" keeps every peer in the
+// peer-address bucket.
+const (
+	ProxyHeaderRealIP       = "x-real-ip"
+	ProxyHeaderForwardedFor = "x-forwarded-for"
+	ProxyHeaderOff          = "off"
+)
+
 type Config struct {
 	Env            Env
 	Listen         string // "unix:/run/.../http.sock" or "127.0.0.1:8081"
@@ -29,6 +38,11 @@ type Config struct {
 	Argon          password.Params
 	CSRFSecret     []byte
 	CookieSecure   bool
+	// ProxyHeader names the header the reverse proxy uses to report the client
+	// address. The header is consulted only when the immediate peer is the local
+	// proxy (an unix-socket peer, which is how nginx connects in production, or
+	// a loopback peer). ProxyHeaderOff disables it entirely.
+	ProxyHeader string
 
 	SessionIdle        time.Duration
 	SessionAbsolute    time.Duration
@@ -64,6 +78,7 @@ func Load(getenv func(string) string) (Config, error) {
 		Listen:             "unix:/run/example-blog-auth/http.sock",
 		Argon:              password.DefaultParams(),
 		CookieSecure:       true,
+		ProxyHeader:        ProxyHeaderRealIP,
 		SessionIdle:        30 * time.Minute,
 		SessionAbsolute:    12 * time.Hour,
 		PendingTTL:         60 * time.Second,
@@ -109,6 +124,13 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	if strings.TrimSpace(getenv("LAB_AUTH_COOKIE_INSECURE")) == "1" {
 		cfg.CookieSecure = false
+	}
+	if raw := strings.TrimSpace(getenv("LAB_AUTH_PROXY_HEADER")); raw != "" {
+		normalized := strings.ToLower(raw)
+		if normalized == "none" {
+			normalized = ProxyHeaderOff
+		}
+		cfg.ProxyHeader = normalized
 	}
 	if len(cfg.CSRFSecret) == 0 && cfg.Env == Development {
 		secret := make([]byte, 32)
@@ -215,6 +237,12 @@ func (c Config) Validate() error {
 	}
 	if len(c.CSRFSecret) < 16 {
 		return fmt.Errorf("config: CSRF secret too short")
+	}
+	switch c.ProxyHeader {
+	case "", ProxyHeaderRealIP, ProxyHeaderForwardedFor, ProxyHeaderOff:
+	default:
+		return fmt.Errorf("config: LAB_AUTH_PROXY_HEADER must be %s, %s or off, got %q",
+			ProxyHeaderRealIP, ProxyHeaderForwardedFor, c.ProxyHeader)
 	}
 	if c.MaxBodyBytes < 1024 || c.MaxBodyBytes > 1<<20 {
 		return fmt.Errorf("config: unreasonable MaxBodyBytes %d", c.MaxBodyBytes)

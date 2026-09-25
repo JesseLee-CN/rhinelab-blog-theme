@@ -56,10 +56,14 @@ func TestValidatePassword(t *testing.T) {
 		err   PasswordError
 	}{
 		{"a", PasswordTooShort},
-		{"aaaaaaaaaaaaaa", PasswordTooShort}, // 14
-		{"aaaaaaaaaaaaaaa", ""},              // 15
-		{"   aaaaaaaaaaa   ", ""},            // surrounding spaces preserved, 17
-		{"\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600", ""}, // 15 code points
+		{"aaaaa", PasswordTooShort}, // 5
+		{"aaaaaa", PasswordWeak},    // length ok, no uppercase and no digit
+		{"AAAAA1", PasswordWeak},    // no lowercase
+		{"aaaaa1", PasswordWeak},    // no uppercase
+		{"Aaaaaa", PasswordWeak},    // no digit
+		{"Aa1bbb", ""},              // the shortest accepted shape
+		{"  Aa1  ", ""},             // surrounding spaces preserved
+		{"\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600", PasswordWeak}, // 6 code points, no ASCII class
 	}
 	for _, tc := range cases {
 		if err := ValidatePassword(tc.value); err != tc.err {
@@ -70,8 +74,9 @@ func TestValidatePassword(t *testing.T) {
 	for i := range longest {
 		longest[i] = 'a'
 	}
+	longest[0], longest[1], longest[2] = 'A', 'a', '1'
 	if err := ValidatePassword(string(longest)); err != "" {
-		t.Fatalf("128 code points should pass, got %q", err)
+		t.Fatalf("128 code points with every class should pass, got %q", err)
 	}
 	if err := ValidatePassword(string(append(longest, 'a'))); err != PasswordTooLong {
 		t.Fatalf("129 code points should be too-long, got %q", err)

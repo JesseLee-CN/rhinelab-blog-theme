@@ -209,8 +209,30 @@ try {
     ((await page.textContent("#entry-error")) ?? "").length > 0,
   );
 
+  // 3b. 面板自带密码显示开关：必须每次都可用（浏览器自带的控件在部分浏览器上
+  // 点开一次后就不再出现，所以由面板提供）。
+  await page.fill("#entry-password", "A very long password 1");
+  const revealStates = [];
+  for (let i = 0; i < 4; i += 1) {
+    await page.click("#entry-reveal");
+    revealStates.push(await page.getAttribute("#entry-password", "type"));
+  }
+  check(
+    "reveal toggles on every click",
+    revealStates.join(",") === "text,password,text,password",
+    revealStates.join(","),
+  );
+  check(
+    "reveal keeps the typed value",
+    (await page.inputValue("#entry-password")) === "A very long password 1",
+  );
+  check(
+    "reveal button reports its state",
+    (await page.getAttribute("#entry-reveal", "aria-pressed")) === "false",
+  );
+
   // 4. Input isolation: "/" and Escape must not reach the archive.
-  await page.fill("#entry-password", "a/very long password");
+  await page.fill("#entry-password", "A/very long password 1");
   await page.keyboard.press("/");
   check(
     "slash does not open search",
@@ -255,7 +277,7 @@ try {
   const reg = await bootGate(desktop, "entryMock=success");
   await reg.click('[data-entry="register"]');
   await reg.fill("#entry-username", "NewUser01");
-  await reg.fill("#entry-password", "a very long password");
+  await reg.fill("#entry-password", "A very long password 1");
   await reg.fill("#entry-confirm", "mismatch password");
   await reg.click("#entry-submit");
   await reg.waitForSelector("#boot-entry.has-error");
@@ -263,7 +285,7 @@ try {
     "mismatched confirm rejected",
     /不一致/.test((await reg.textContent("#entry-error")) ?? ""),
   );
-  await reg.fill("#entry-confirm", "a very long password");
+  await reg.fill("#entry-confirm", "A very long password 1");
   await reg.click("#entry-submit");
   await reg.waitForSelector("#boot-entry.has-success");
   check(
@@ -298,8 +320,8 @@ try {
   const regFail = await bootGate(desktop, "entryMock=register-fail");
   await regFail.click('[data-entry="register"]');
   await regFail.fill("#entry-username", "taken");
-  await regFail.fill("#entry-password", "a very long password");
-  await regFail.fill("#entry-confirm", "a very long password");
+  await regFail.fill("#entry-password", "A very long password 1");
+  await regFail.fill("#entry-confirm", "A very long password 1");
   await regFail.click("#entry-submit");
   await regFail.waitForSelector("#boot-entry.has-error");
   check(
@@ -315,8 +337,8 @@ try {
   const regOff = await bootGate(desktop, "entryMock=register-disabled");
   await regOff.click('[data-entry="register"]');
   await regOff.fill("#entry-username", "NewUser02");
-  await regOff.fill("#entry-password", "a very long password");
-  await regOff.fill("#entry-confirm", "a very long password");
+  await regOff.fill("#entry-password", "A very long password 1");
+  await regOff.fill("#entry-confirm", "A very long password 1");
   await regOff.click("#entry-submit");
   await regOff.waitForSelector("#boot-entry.has-error");
   check(
@@ -328,7 +350,7 @@ try {
   // 8. Escape cancels an in-flight login; GUEST still commits afterwards.
   const slow = await bootGate(desktop, "entryMock=timeout");
   await slow.fill("#entry-username", "JOYCE_MOORE");
-  await slow.fill("#entry-password", "a very long password");
+  await slow.fill("#entry-password", "A very long password 1");
   await slow.click("#entry-submit");
   await slow.waitForSelector("#boot-entry[data-busy]", { timeout: 5000 });
   await slow.focus("#entry-submit");
@@ -418,6 +440,47 @@ try {
     animations: "disabled",
   });
   await mobile.close();
+
+  // 9. 深色主题：面板自带的控件必须跟着主题走（曾经漏掉显示/隐藏密码开关，
+  // 它在暗色幕布上几乎看不见）。
+  const darkContext = await browser.newContext({
+    viewport: { width: 1920, height: 1080 },
+  });
+  const darkPage = await darkContext.newPage();
+  await darkPage.addInitScript(() =>
+    localStorage.setItem("rhine-settings", JSON.stringify({ colorTheme: "dark" })),
+  );
+  await darkPage.goto(`${base}/?entryMock=success`, {
+    waitUntil: "domcontentloaded",
+  });
+  await darkPage.waitForSelector('#boot-entry[data-phase="login"]', {
+    timeout: 60000,
+  });
+  const darkTheme = await darkPage.evaluate(() => {
+    const reveal = document.querySelector("#entry-reveal");
+    const label = document.querySelector(".entry-label");
+    return {
+      darkSurface: document.documentElement.dataset.darkSurface,
+      reveal: getComputedStyle(reveal).color,
+      label: getComputedStyle(label).color,
+      opacity: getComputedStyle(reveal).opacity,
+    };
+  });
+  check(
+    "dark surface applied",
+    darkTheme.darkSurface === "true",
+    JSON.stringify(darkTheme),
+  );
+  check(
+    "reveal button follows the dark theme",
+    darkTheme.reveal === darkTheme.label,
+    JSON.stringify(darkTheme),
+  );
+  await darkPage.screenshot({
+    path: `${outDir}/login-dark.png`,
+    animations: "disabled",
+  });
+  await darkContext.close();
 } finally {
   await browser.close();
   await server.close();

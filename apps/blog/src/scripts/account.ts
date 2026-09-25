@@ -52,8 +52,10 @@ function ruleError(field: "username" | "password", error: string): string {
     if (error === "charset") return "用户名只能包含字母、数字与 . _ - 。";
     if (error === "reserved") return "该用户名被保留。";
   }
-  if (error === "too-short") return "密码至少 15 个字符。";
+  if (error === "too-short") return "密码至少 6 个字符。";
   if (error === "too-long") return "密码最多 128 个字符。";
+  if (error === "weak")
+    return "密码至少包含一个大写字母、一个小写字母和一个数字。";
   return "输入不符合规则。";
 }
 
@@ -90,6 +92,9 @@ function initAccountPage(): void {
   const password = form.querySelector<HTMLInputElement>("#account-password");
   const confirmField = form.querySelector<HTMLElement>("[data-account-confirm]");
   const confirm = form.querySelector<HTMLInputElement>("#account-confirm");
+  const revealButtons = [
+    ...form.querySelectorAll<HTMLButtonElement>("[data-account-reveal]"),
+  ];
   const tabs = [...form.querySelectorAll<HTMLButtonElement>("[data-account-mode]")];
   let mode: "login" | "register" = "login";
 
@@ -99,6 +104,35 @@ function initAccountPage(): void {
     status.dataset.kind = kind;
   };
 
+  const revealTargets = revealButtons
+    .map((button) => ({
+      button,
+      input: form.querySelector<HTMLInputElement>(`#${button.dataset.accountReveal}`),
+    }))
+    .filter((entry): entry is { button: HTMLButtonElement; input: HTMLInputElement } => entry.input !== null);
+
+  /**
+   * Show or hide the password in plain text. The browser's own reveal control is
+   * not usable here: it differs per browser and in some of them it cannot be used
+   * a second time, so the page owns this toggle instead.
+   */
+  function setRevealed(reveal: boolean): void {
+    for (const { button, input } of revealTargets) {
+      input.type = reveal ? "text" : "password";
+      button.setAttribute("aria-pressed", String(reveal));
+      button.textContent = reveal ? "隐藏" : "显示";
+      button.setAttribute("aria-label", reveal ? "隐藏密码" : "显示密码");
+    }
+  }
+
+  for (const { button, input } of revealTargets) {
+    // Progressive enhancement: the control only appears once it can actually work.
+    button.hidden = false;
+    button.addEventListener("click", () => {
+      setRevealed(input.type === "password");
+    });
+  }
+
   const setMode = (next: "login" | "register"): void => {
     mode = next;
     for (const tab of tabs) tab.setAttribute("aria-selected", String(tab.dataset.accountMode === next));
@@ -106,6 +140,7 @@ function initAccountPage(): void {
     if (confirm) confirm.required = next === "register";
     if (submit) submit.textContent = next === "register" ? "注册" : "登录";
     if (password) password.autocomplete = next === "register" ? "new-password" : "current-password";
+    setRevealed(false);
     setStatus("");
   };
 

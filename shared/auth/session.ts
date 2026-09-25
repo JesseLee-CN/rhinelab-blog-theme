@@ -43,7 +43,12 @@ export interface SessionBridge {
   login(username: string, password: string, signal?: AbortSignal): Promise<PublicUser>;
   /** Register: creates the account but never signs it in (server contract). */
   register(username: string, password: string, signal?: AbortSignal): Promise<PublicUser>;
-  /** Logout; the cookie is cleared even when the request fails locally. */
+  /**
+   * Logout: asks the server to revoke the session and clear its HttpOnly cookie.
+   * That request is the only thing that can end the session — the cookie is not
+   * readable or clearable from script — so a failure has to reach the caller
+   * instead of being reported as a successful sign-out.
+   */
   logout(): Promise<void>;
   /** Observe session changes from this tab and from other tabs. */
   subscribe(listener: (session: AccountSession) => void): () => void;
@@ -94,7 +99,10 @@ export function createSessionBridge(options: SessionBridgeOptions = {}): Session
     }
     if (!channel) {
       try {
-        localStorage.setItem(PING_KEY, JSON.stringify(ping));
+        // Only a tick is persisted. Web storage is readable by any same-origin
+        // script, so the session object — which carries the CSRF token — stays
+        // out of it; other tabs re-read the cookie instead of trusting a value.
+        localStorage.setItem(PING_KEY, String(ping.at));
       } catch {
         // Private mode or a full quota: cross-tab sync is best effort.
       }
@@ -123,13 +131,9 @@ export function createSessionBridge(options: SessionBridgeOptions = {}): Session
   };
   const onStorage = (event: StorageEvent) => {
     if (event.key !== PING_KEY || !event.newValue) return;
-    try {
-      const ping = JSON.parse(event.newValue) as Ping;
-      if (ping.session) publish(ping.session);
-      else void read({ refresh: true }).catch(() => {});
-    } catch {
-      // A malformed ping is ignored; the next read still sees the cookie.
-    }
+    // The stored value is only a tick; the authoritative state comes from the
+    // cookie on the next read.
+    void read({ refresh: true }).catch(() => {});
   };
   channel?.addEventListener("message", onChannelMessage as EventListener);
   if (!channel && typeof addEventListener === "function") {
@@ -169,7 +173,9 @@ export function createSessionBridge(options: SessionBridgeOptions = {}): Session
       }
     },
     async logout() {
-      const session = await read({ refresh: true }).catch(() => null);
+      // A failed refresh falls back to the last known session so a flaky network
+      // does not silently leave the server-side session alive.
+      const session = await read({ refresh: true }).catch(() => cached);
       if (session?.authenticated) await port.logout(session.csrfToken);
       publish({ authenticated: false });
       broadcast({ authenticated: false });

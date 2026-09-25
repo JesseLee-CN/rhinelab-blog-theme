@@ -22,7 +22,7 @@ func TestListAccountsFiltersAndPages(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
 	for _, name := range []string{"alpha", "beta", "gamma"} {
-		createAccount(t, s, name, "a long enough password")
+		createAccount(t, s, name, "A long enough password 1")
 	}
 	if err := s.SetEnabled("beta", false); err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestListAccountsFiltersAndPages(t *testing.T) {
 func TestGetAccountResolvesUsernameOrID(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
-	created := createAccount(t, s, "Joyce_Moore", "a long enough password")
+	created := createAccount(t, s, "Joyce_Moore", "A long enough password 1")
 
 	byName, err := s.GetAccount("joyce_moore")
 	if err != nil || byName.ID != created.ID {
@@ -103,7 +103,7 @@ func TestGetAccountResolvesUsernameOrID(t *testing.T) {
 func TestSetAccountEnabledAndSessionRevocation(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
-	createAccount(t, s, "joyce", "a long enough password")
+	createAccount(t, s, "joyce", "A long enough password 1")
 
 	disabled, err := s.SetAccountEnabled("joyce", false)
 	if err != nil || disabled.Enabled {
@@ -130,9 +130,9 @@ func TestSetAccountEnabledAndSessionRevocation(t *testing.T) {
 func TestDeleteAccountRemovesDependentRowsAndGuardsTheLastOne(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
-	first := createAccount(t, s, "first", "a long enough password")
-	second := createAccount(t, s, "second", "a long enough password")
-	createAccount(t, s, "third", "a long enough password")
+	first := createAccount(t, s, "first", "A long enough password 1")
+	second := createAccount(t, s, "second", "A long enough password 1")
+	createAccount(t, s, "third", "A long enough password 1")
 
 	// login_attempts and sessions reference users without ON DELETE CASCADE, so a
 	// naive delete would fail on the foreign key: this asserts the transaction
@@ -197,7 +197,7 @@ func TestDeleteAccountRemovesDependentRowsAndGuardsTheLastOne(t *testing.T) {
 func TestAuditTrailIsAppendOnlyAndQueryable(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
-	createAccount(t, s, "joyce", "a long enough password")
+	createAccount(t, s, "joyce", "A long enough password 1")
 
 	first, err := s.AppendAudit(AuditEntry{Actor: "cli:test", Action: "user.create", Target: "joyce"})
 	if err != nil {
@@ -239,11 +239,11 @@ func TestAuditTrailIsAppendOnlyAndQueryable(t *testing.T) {
 func TestStatusAndVerifyReportTheDatabase(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
-	createAccount(t, s, "joyce", "a long enough password")
+	createAccount(t, s, "joyce", "A long enough password 1")
 	if err := s.SetEnabled("joyce", false); err != nil {
 		t.Fatal(err)
 	}
-	createAccount(t, s, "other", "a long enough password")
+	createAccount(t, s, "other", "A long enough password 1")
 	if _, err := s.AppendAudit(AuditEntry{Actor: "cli:test", Action: "user.create", Target: "other"}); err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestStatusAndVerifyReportTheDatabase(t *testing.T) {
 func TestListSessionsJoinsTheAccount(t *testing.T) {
 	s := openTest(t)
 	defer s.Close()
-	user := createAccount(t, s, "joyce", "a long enough password")
+	user := createAccount(t, s, "joyce", "A long enough password 1")
 	if _, err := s.db.Exec(
 		`INSERT INTO sessions(session_id, token_hash, user_id, state, credential_version,
 		   csrf_hash, idle_expires_at, absolute_expires_at, created_at, last_seen_at)

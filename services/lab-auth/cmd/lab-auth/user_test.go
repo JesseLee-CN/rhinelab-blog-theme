@@ -22,7 +22,7 @@ func prepareDB(t *testing.T) string {
 
 func createUserViaCLI(t *testing.T, db, username string) string {
 	t.Helper()
-	const password = "a long enough password"
+	const password = "A long enough password 1"
 	out, _, err := runCLI(t, []string{"user", "create", "-db", db, username}, password+"\n"+password+"\n")
 	if err != nil {
 		t.Fatalf("create %s: %v", username, err)

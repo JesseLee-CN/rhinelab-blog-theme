@@ -20,7 +20,7 @@ import (
 
 const (
 	origin    = "https://test.example"
-	password1 = "a very long password"
+	password1 = "A very long password 1"
 )
 
 func lowArgon() password.Params {
@@ -302,12 +302,28 @@ func TestUnknownUserLooksLikeWrongPassword(t *testing.T) {
 	if unknown.status != wrong.status {
 		t.Fatalf("status differs: unknown=%d wrong=%d", unknown.status, wrong.status)
 	}
-	if string(unknown.body) != string(wrong.body) {
+	// Compare the error payload only: each reply carries its own request id, which
+	// is not something an attacker can use to tell the two cases apart.
+	if payloadOf(t, unknown) != payloadOf(t, wrong) {
 		t.Fatalf("body differs:\n%s\n%s", unknown.body, wrong.body)
 	}
 	if unknown.status != http.StatusUnauthorized {
 		t.Fatalf("status = %d", unknown.status)
 	}
+}
+
+func payloadOf(t *testing.T, res response) string {
+	t.Helper()
+	var body struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(res.body, &body); err != nil {
+		t.Fatal(err)
+	}
+	return body.Error.Code + "|" + body.Error.Message
 }
 
 func TestOriginAndCSRFRejected(t *testing.T) {
@@ -443,7 +459,7 @@ func TestDisableAndResetBlockConfirm(t *testing.T) {
 	if res := c2.login(csrf2, "JOYCE_MOORE", password1); res.status != http.StatusOK {
 		t.Fatal("login failed")
 	}
-	if err := e.store.ResetPassword("JOYCE_MOORE", "a brand new long password"); err != nil {
+	if err := e.store.ResetPassword("JOYCE_MOORE", "A brand new long password 1"); err != nil {
 		t.Fatal(err)
 	}
 	if res := c2.json(http.MethodPost, "/lab/api/auth/confirm", map[string]string{"attemptId": csrf2.AttemptID},
@@ -511,6 +527,190 @@ func TestSourceRateLimit(t *testing.T) {
 	}
 	if last != http.StatusTooManyRequests {
 		t.Fatalf("expected rate limit, got %d", last)
+	}
+}
+
+// directRequest drives the handler in-process so the test can choose the
+// RemoteAddr that net/http reports for an unix-socket peer (empty). That is the
+// production topology: nginx talks to the service over a unix socket.
+func directRequest(t *testing.T, handler http.Handler, remoteAddr string, headers map[string]string) int {
+	return directCall(t, handler, http.MethodGet, "/lab/api/auth/csrf", remoteAddr, headers)
+}
+
+func directCall(t *testing.T, handler http.Handler, method, path, remoteAddr string, headers map[string]string) int {
+	t.Helper()
+	req := httptest.NewRequest(method, path, nil)
+	req.RemoteAddr = remoteAddr
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	return rec.Code
+}
+
+// TestSessionReadIsRateLimited: every page load asks for the session, and a live
+// session also refreshes its idle deadline, so an anonymous caller must not be
+// able to drive that write path without bound.
+func TestSessionReadIsRateLimited(t *testing.T) {
+	handler := handlerWithoutSockets(t, func(cfg *config.Config) { cfg.SourceRatePerMin = 1 })
+	const path = "/lab/api/auth/session"
+	for i := 0; i < 6; i++ {
+		if code := directCall(t, handler, http.MethodGet, path, "", map[string]string{"X-Real-IP": "198.51.100.1"}); code != http.StatusOK {
+			t.Fatalf("session read %d = %d, want 200", i+1, code)
+		}
+	}
+	if code := directCall(t, handler, http.MethodGet, path, "", map[string]string{"X-Real-IP": "198.51.100.1"}); code != http.StatusTooManyRequests {
+		t.Fatalf("seventh session read = %d, want 429", code)
+	}
+	if code := directCall(t, handler, http.MethodGet, path, "", map[string]string{"X-Real-IP": "198.51.100.2"}); code != http.StatusOK {
+		t.Fatalf("another client shares the bucket: got %d, want 200", code)
+	}
+}
+
+// handlerWithoutSockets builds a server directly instead of going through
+// httptest.NewServer: the rate-limit key depends on the peer address, so these
+// tests must control RemoteAddr themselves — and a listening socket is not
+// available in every environment the suite runs in.
+func handlerWithoutSockets(t *testing.T, mutate func(*config.Config)) http.Handler {
+	t.Helper()
+	db := filepath.Join(t.TempDir(), "rl.db")
+	st, err := store.Open(db, store.WithArgon(lowArgon()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.Migrate(); err != nil {
+		st.Close()
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { st.Close() })
+	cfg := testConfig(db)
+	if mutate != nil {
+		mutate(&cfg)
+	}
+	srv, err := server.New(cfg, st, server.Options{InsecureCookies: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return srv.Handler()
+}
+
+// TestSourceLimitIsPerClientBehindLocalProxy covers the production topology: the
+// immediate peer is nginx, so the client address has to come from the configured
+// header. Before this, the peer check only recognised loopback, every request
+// behind the unix socket collapsed into one bucket, and a single caller could
+// exhaust the whole site's login budget.
+func TestSourceLimitIsPerClientBehindLocalProxy(t *testing.T) {
+	for _, peer := range []string{"", "127.0.0.1:41234"} {
+		t.Run("peer="+peer, func(t *testing.T) {
+			handler := handlerWithoutSockets(t, func(cfg *config.Config) { cfg.SourceRatePerMin = 1 })
+			// /csrf allows SourceRatePerMin*3 requests per window and key.
+			for i := 0; i < 3; i++ {
+				if code := directRequest(t, handler, peer, map[string]string{"X-Real-IP": "198.51.100.1"}); code != http.StatusOK {
+					t.Fatalf("request %d for client A = %d, want 200", i+1, code)
+				}
+			}
+			if code := directRequest(t, handler, peer, map[string]string{"X-Real-IP": "198.51.100.1"}); code != http.StatusTooManyRequests {
+				t.Fatalf("fourth request for client A = %d, want 429", code)
+			}
+			if code := directRequest(t, handler, peer, map[string]string{"X-Real-IP": "198.51.100.2"}); code != http.StatusOK {
+				t.Fatalf("client B shares client A's bucket: got %d, want 200", code)
+			}
+		})
+	}
+}
+
+// TestSourceLimitIgnoresForwardedHeaderFromRemotePeer ensures a direct client can
+// never pick its own bucket: the header is only read from the local proxy, so a
+// remote peer keeps using its peer address even while spoofing X-Real-IP.
+func TestSourceLimitIgnoresForwardedHeaderFromRemotePeer(t *testing.T) {
+	handler := handlerWithoutSockets(t, func(cfg *config.Config) { cfg.SourceRatePerMin = 1 })
+	addresses := []string{"198.51.100.1", "198.51.100.2", "198.51.100.3"}
+	for i, address := range addresses {
+		if code := directRequest(t, handler, "203.0.113.9:5555", map[string]string{"X-Real-IP": address}); code != http.StatusOK {
+			t.Fatalf("spoofed request %d = %d, want 200", i+1, code)
+		}
+	}
+	if code := directRequest(t, handler, "203.0.113.9:5555", map[string]string{"X-Real-IP": "198.51.100.4"}); code != http.StatusTooManyRequests {
+		t.Fatalf("spoofing the header minted a fresh bucket: got %d, want 429", code)
+	}
+}
+
+// TestSourceLimitUsesTheRightmostForwardedEntry pins the X-Forwarded-For rule:
+// our proxy appends the address it saw, so only the right-most entry may be
+// trusted. A left-most (client-supplied) value must not create a new bucket.
+func TestSourceLimitUsesTheRightmostForwardedEntry(t *testing.T) {
+	handler := handlerWithoutSockets(t, func(cfg *config.Config) {
+		cfg.SourceRatePerMin = 1
+		cfg.ProxyHeader = config.ProxyHeaderForwardedFor
+	})
+	spoof := map[string]string{"X-Forwarded-For": "1.2.3.4, 198.51.100.9"}
+	otherSpoof := map[string]string{"X-Forwarded-For": "5.6.7.8, 198.51.100.9"}
+	for i := 0; i < 3; i++ {
+		if code := directRequest(t, handler, "", spoof); code != http.StatusOK {
+			t.Fatalf("request %d = %d, want 200", i+1, code)
+		}
+	}
+	if code := directRequest(t, handler, "", otherSpoof); code != http.StatusTooManyRequests {
+		t.Fatalf("left-most entry was trusted: got %d, want 429", code)
+	}
+	other := map[string]string{"X-Forwarded-For": "1.2.3.4, 198.51.100.10"}
+	if code := directRequest(t, handler, "", other); code != http.StatusOK {
+		t.Fatalf("new right-most entry did not get its own bucket: got %d, want 200", code)
+	}
+}
+
+// TestSourceLimitFallsBackToThePeerBucket covers the cases that must all land in
+// one bucket rather than handing a caller a fresh key per request: the feature is
+// switched off, the header is absent, or its value is not a bare IP literal.
+func TestSourceLimitFallsBackToThePeerBucket(t *testing.T) {
+	cases := []struct {
+		name    string
+		mutate  func(*config.Config)
+		headers []map[string]string
+	}{
+		{
+			name:   "off",
+			mutate: func(cfg *config.Config) { cfg.SourceRatePerMin = 1; cfg.ProxyHeader = config.ProxyHeaderOff },
+			headers: []map[string]string{
+				{"X-Real-IP": "198.51.100.1"},
+				{"X-Real-IP": "198.51.100.2"},
+				{"X-Real-IP": "198.51.100.3"},
+				{"X-Real-IP": "198.51.100.4"},
+			},
+		},
+		{
+			name:   "header missing",
+			mutate: func(cfg *config.Config) { cfg.SourceRatePerMin = 1 },
+			headers: []map[string]string{
+				{}, {}, {}, {},
+			},
+		},
+		{
+			name:   "malformed values",
+			mutate: func(cfg *config.Config) { cfg.SourceRatePerMin = 1 },
+			headers: []map[string]string{
+				{"X-Real-IP": "not-an-ip"},
+				{"X-Real-IP": "198.51.100.1:443"},
+				{"X-Real-IP": "300.1.2.3"},
+				{"X-Real-IP": "  "},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := handlerWithoutSockets(t, tc.mutate)
+			for i, headers := range tc.headers {
+				code := directRequest(t, handler, "", headers)
+				want := http.StatusOK
+				if i == len(tc.headers)-1 {
+					want = http.StatusTooManyRequests
+				}
+				if code != want {
+					t.Fatalf("request %d = %d, want %d", i+1, code, want)
+				}
+			}
+		})
 	}
 }
 
@@ -603,5 +803,95 @@ func TestHealth(t *testing.T) {
 	}
 	if res := c.do(http.MethodGet, "/health/ready", "", nil); res.status != http.StatusOK {
 		t.Fatalf("ready status = %d", res.status)
+	}
+}
+
+// TestConfirmAndCancelAreBoundToTheFlow: knowing (or guessing) an attempt id must
+// not let another flow confirm or cancel it. The attempt belongs to the flow that
+// opened it, and the owner can still finish its own login afterwards.
+func TestConfirmAndCancelAreBoundToTheFlow(t *testing.T) {
+	e := setup(t)
+	e.createUser("JOYCE_MOORE", password1)
+	owner := e.client()
+	ownerCSRF := owner.csrf()
+	if res := owner.login(ownerCSRF, "JOYCE_MOORE", password1); res.status != http.StatusOK {
+		t.Fatalf("owner login = %d body=%s", res.status, res.body)
+	}
+
+	other := e.client()
+	otherCSRF := other.csrf()
+	res := other.json(http.MethodPost, "/lab/api/auth/confirm",
+		map[string]string{"attemptId": ownerCSRF.AttemptID},
+		map[string]string{"X-CSRF-Token": otherCSRF.CSRFToken})
+	if res.status != http.StatusUnauthorized {
+		t.Fatalf("confirm from another flow = %d body=%s", res.status, res.body)
+	}
+	if res := other.json(http.MethodPost, "/lab/api/auth/cancel",
+		map[string]string{"attemptId": ownerCSRF.AttemptID},
+		map[string]string{"X-CSRF-Token": otherCSRF.CSRFToken}); res.status != http.StatusNoContent {
+		t.Fatalf("cancel from another flow = %d body=%s", res.status, res.body)
+	}
+	if res := owner.json(http.MethodPost, "/lab/api/auth/confirm",
+		map[string]string{"attemptId": ownerCSRF.AttemptID},
+		map[string]string{"X-CSRF-Token": ownerCSRF.CSRFToken}); res.status != http.StatusOK {
+		t.Fatalf("owner confirm after a foreign cancel = %d body=%s", res.status, res.body)
+	}
+}
+
+// TestErrorBodyCarriesTheRequestID keeps the documented error shape honest: the
+// id in the body has to match the X-Request-Id header operators grep for.
+func TestErrorBodyCarriesTheRequestID(t *testing.T) {
+	e := setup(t)
+	e.createUser("JOYCE_MOORE", password1)
+	c := e.client()
+	res := c.login(c.csrf(), "JOYCE_MOORE", "definitely not the password")
+	if res.status != http.StatusUnauthorized {
+		t.Fatalf("status = %d body=%s", res.status, res.body)
+	}
+	var body struct {
+		RequestID string `json:"requestId"`
+	}
+	if err := json.Unmarshal(res.body, &body); err != nil {
+		t.Fatal(err)
+	}
+	if header := res.headers.Get("X-Request-Id"); header == "" || body.RequestID != header {
+		t.Fatalf("body requestId = %q, header = %q", body.RequestID, header)
+	}
+}
+
+// TestLoginUpgradesAStalePasswordHash wires NeedsRehash into the login path: a
+// stored hash that is weaker than the configured parameters is rewritten as soon
+// as it verifies, so raising the Argon2 work factor actually takes effect.
+func TestLoginUpgradesAStalePasswordHash(t *testing.T) {
+	stronger := lowArgon()
+	stronger.Iterations = 2
+	e := setupWith(t, func(cfg *config.Config) { cfg.Argon = stronger })
+	e.createUser("JOYCE_MOORE", password1)
+	if _, phc, err := e.store.GetUserByKey("JOYCE_MOORE"); err != nil {
+		t.Fatal(err)
+	} else if !password.NeedsRehash(phc, stronger) {
+		t.Fatalf("fixture hash already at the target parameters: %s", phc)
+	}
+	c := e.client()
+	csrf := c.csrf()
+	if res := c.login(csrf, "JOYCE_MOORE", password1); res.status != http.StatusOK {
+		t.Fatalf("login = %d body=%s", res.status, res.body)
+	}
+	_, phc, err := e.store.GetUserByKey("JOYCE_MOORE")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if password.NeedsRehash(phc, stronger) {
+		t.Fatalf("hash was not upgraded: %s", phc)
+	}
+	// The upgrade must not bump the credential version, or the pending session
+	// created by this very login would be rejected when it is confirmed.
+	if res := c.json(http.MethodPost, "/lab/api/auth/confirm",
+		map[string]string{"attemptId": csrf.AttemptID},
+		map[string]string{"X-CSRF-Token": csrf.CSRFToken}); res.status != http.StatusOK {
+		t.Fatalf("confirm after rehash = %d body=%s", res.status, res.body)
+	}
+	if got := e.sessionOf(c); !got.Authenticated {
+		t.Fatalf("session not established after rehash: %+v", got)
 	}
 }

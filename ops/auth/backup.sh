@@ -20,9 +20,12 @@ fi
 BIN="${BIN:-$(command -v lab-auth || true)}"
 [ -n "$BIN" ] || { echo "lab-auth binary not found" >&2; exit 1; }
 mkdir -p "$OUT_DIR"
+chmod 0700 "$OUT_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 TARGET="$OUT_DIR/auth-$STAMP.db"
 "$BIN" backup -db "$DB" -out "$TARGET"
+# 双保险：CLI 已写成 0600，这里再收敛一次（快照含口令散列）。
+chmod 0600 "$TARGET"
 # Keep the newest N snapshots.
 ls -1t "$OUT_DIR"/auth-*.db 2>/dev/null | tail -n +"$((KEEP + 1))" | xargs -r rm -f
 echo "backup written: $TARGET"

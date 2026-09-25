@@ -36,6 +36,13 @@ func (s *Store) Backup(dest string) error {
 	if _, err := s.db.Exec(`VACUUM INTO ` + quoteSQLiteString(dest)); err != nil {
 		return err
 	}
+	// VACUUM INTO creates the file under the process umask, and a snapshot holds
+	// password hashes and session digests: force owner-only so a world-readable
+	// umask on the backup host cannot leak the account database.
+	if err := os.Chmod(dest, 0o600); err != nil {
+		os.Remove(dest)
+		return err
+	}
 	return nil
 }
 

@@ -103,8 +103,11 @@ ssh root@203.0.113.10 "DEPLOY_ROOT=/srv/example-blog bash /srv/example-blog/ops/
 
 - 二进制放 `/srv/example-blog-auth/releases/<版本>/`，用 `current` 软链切换；
 - 配置放 `/etc/example-blog-auth/auth.env`（0640，属主为服务用户），数据在 `/var/lib/example-blog-auth/`；
-- 服务只监听 unix socket，由 nginx 代理 `/lab/api/auth/`，不直接暴露端口；
-- 备份使用一致性快照并对快照做完整性校验（见 `ops/auth/backup.sh`）。
+- 服务只监听 unix socket，由 nginx 代理规范前缀 `/api/auth/`（兼容别名 `/lab/api/auth/`），
+  不直接暴露端口；片段同时把 `/…/admin/` 直接返回 404，管理面默认不在公网可达，需要远程操作时
+  在 nginx 上按网段放行或走内网/隧道，不要把管理前缀挂回公网；
+- 备份使用一致性快照并对快照做完整性校验（见 `ops/auth/backup.sh`）；快照含口令散列，CLI 与
+  systemd unit 都按 `0600` / `UMask=0077` 收敛权限。
 
 ## 8. 健康检查与定时任务
 

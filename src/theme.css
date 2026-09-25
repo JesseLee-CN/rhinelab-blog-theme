@@ -90,8 +90,11 @@
 [data-dark-surface="true"] .boot-entry { color: var(--theme-ink); }
 [data-dark-surface="true"] .entry-label,
 [data-dark-surface="true"] .entry-field input { color: var(--theme-ink); }
+/* 面板自带的显示/隐藏密码开关也要跟着深色主题走，否则暗色幕布上读不出来。 */
+[data-dark-surface="true"] .entry-reveal { color: var(--theme-ink); opacity: 0.85; }
+[data-dark-surface="true"] .entry-reveal:hover { color: var(--theme-accent); opacity: 1; }
 [data-dark-surface="true"] .entry-field input:focus { border-bottom-color: var(--theme-ink); }
-[data-dark-surface="true"] :is(.entry-continue, .entry-field input, .entry-submit, .entry-link):focus-visible { outline-color: var(--theme-ink); }
+[data-dark-surface="true"] :is(.entry-continue, .entry-field input, .entry-submit, .entry-link, .entry-reveal):focus-visible { outline-color: var(--theme-ink); }
 [data-dark-surface="true"] .entry-submit { background: var(--theme-ink); color: var(--theme-paper); }
 [data-dark-surface="true"] .entry-continue { border-color: var(--theme-ink); }
 [data-dark-surface="true"] .entry-link:hover { color: var(--theme-accent); }

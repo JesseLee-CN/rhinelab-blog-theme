@@ -8,6 +8,8 @@ After=network.target example-auth.service
 [Service]
 Type=oneshot
 ExecStart=/srv/example-blog-auth/ops/backup.sh --db /var/lib/example-blog-auth/auth.db --out-dir /var/backups/example-blog-auth --keep 7 --bin /srv/example-blog-auth/releases/current/lab-auth
+# 快照含口令散列与会话摘要：即使迁移脚本漏了 chmod，也由 systemd 兜住权限。
+UMask=0077
 Nice=10
 IOSchedulingClass=idle
 NoNewPrivileges=true

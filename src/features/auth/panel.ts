@@ -31,7 +31,8 @@ const USERNAME_MESSAGES: Record<UsernameError, string> = {
   reserved: "该用户名不可用",
 };
 
-const PASSWORD_MESSAGE = "密码长度需为 15–128 个字符";
+const PASSWORD_MESSAGE =
+  "密码需为 6–128 个字符，且至少包含一个大写字母、一个小写字母和一个数字";
 
 const AUTH_MESSAGES: Record<string, string> = {
   invalid_credentials: "用户名或密码错误",
@@ -71,6 +72,7 @@ export class BootEntry {
   private readonly username: HTMLInputElement;
   private readonly password: HTMLInputElement;
   private readonly confirm: HTMLInputElement;
+  private readonly revealButton: HTMLButtonElement;
   private readonly confirmRow: HTMLElement;
   private readonly errorLine: HTMLElement;
   private readonly submit: HTMLButtonElement;
@@ -82,6 +84,7 @@ export class BootEntry {
 
   private phaseValue: EntryPanelPhase = "login";
   private busyValue = false;
+  private revealed = false;
   private epoch = 0;
   private attempt: Attempt | null = null;
   private composing = false;
@@ -105,6 +108,8 @@ export class BootEntry {
         <label class="entry-field" data-intro-row>
           <span class="entry-label">PASSWORD:</span>
           <input id="entry-password" name="password" type="password" autocomplete="current-password" required>
+          <button type="button" class="entry-reveal" id="entry-reveal" data-entry="reveal"
+                  aria-pressed="false" aria-label="显示密码">SHOW</button>
         </label>
         <label class="entry-field" id="entry-confirm-row" data-intro-row hidden>
           <span class="entry-label">CONFIRM PASSWORD:</span>
@@ -128,6 +133,8 @@ export class BootEntry {
       this.element.querySelector<HTMLInputElement>("#entry-password")!;
     this.confirm =
       this.element.querySelector<HTMLInputElement>("#entry-confirm")!;
+    this.revealButton =
+      this.element.querySelector<HTMLButtonElement>("#entry-reveal")!;
     this.confirmRow =
       this.element.querySelector<HTMLElement>("#entry-confirm-row")!;
     this.errorLine = this.element.querySelector<HTMLElement>("#entry-error")!;
@@ -227,6 +234,9 @@ export class BootEntry {
       case "back":
         this.backToLogin();
         break;
+      case "reveal":
+        this.setRevealed(!this.revealed);
+        break;
     }
   };
 
@@ -298,6 +308,25 @@ export class BootEntry {
     this.password.setAttribute(
       "autocomplete",
       register ? "new-password" : "current-password",
+    );
+    this.setRevealed(false);
+  }
+
+  /**
+   * Show or hide the typed password in plain text.
+   *
+   * 浏览器自带的密码显示按钮在各浏览器上行为不一致（有的关掉之后不再出现，等于只能
+   * 用一次），所以由面板自己提供开关：只切换输入框类型，不碰输入值，也不参与提交。
+   */
+  private setRevealed(reveal: boolean): void {
+    this.revealed = reveal;
+    this.password.type = reveal ? "text" : "password";
+    this.confirm.type = reveal ? "text" : "password";
+    this.revealButton.setAttribute("aria-pressed", String(reveal));
+    this.revealButton.textContent = reveal ? "HIDE" : "SHOW";
+    this.revealButton.setAttribute(
+      "aria-label",
+      reveal ? "隐藏密码" : "显示密码",
     );
   }
 

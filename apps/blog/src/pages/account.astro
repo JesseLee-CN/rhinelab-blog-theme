@@ -43,13 +43,17 @@ import BaseLayout from "../layouts/BaseLayout.astro";
       <label class="account-field">
         <span>密码</span>
         <input id="account-password" name="password" type="password" autocomplete="current-password" required />
+        <button type="button" class="account-reveal" data-account-reveal="account-password"
+                aria-pressed="false" aria-label="显示密码" hidden>显示</button>
       </label>
       <label class="account-field" data-account-confirm hidden>
         <span>确认密码</span>
         <input id="account-confirm" name="confirm" type="password" autocomplete="new-password" />
+        <button type="button" class="account-reveal" data-account-reveal="account-confirm"
+                aria-pressed="false" aria-label="显示密码" hidden>显示</button>
       </label>
 
-      <p class="account-rules">用户名 3–24 位，可用字母、数字与 <code>._-</code>；密码至少 15 位。</p>
+      <p class="account-rules">用户名 3–24 位，可用字母、数字与 <code>._-</code>；密码 6–128 位，至少含一个大写字母、一个小写字母和一个数字。</p>
       <p class="account-status" role="status" aria-live="polite" data-account-status></p>
       <button type="submit" class="account-button" data-account-submit>登录</button>
     </form>

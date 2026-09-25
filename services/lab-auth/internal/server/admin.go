@@ -103,9 +103,24 @@ type adminSessionModel struct {
 // authorizeAdmin enforces the bearer token. The comparison is constant time and
 // the failure is deliberately uniform: no distinction between an absent, wrong
 // or empty token is observable from the response.
+//
+// The rate limit is charged *before* the token is inspected, so a wrong or
+// missing token cannot be retried without bound. Failed attempts are logged but
+// deliberately not audited: the audit trail is append-only and never pruned, so
+// an unauthenticated caller must not be able to add rows to it.
 func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
 	if s.cfg.AdminToken == "" {
 		writeError(w, http.StatusServiceUnavailable, "admin_disabled", "管理接口未启用")
+		return false
+	}
+	limit := s.cfg.AdminRate
+	if limit < 1 {
+		limit = 60
+	}
+	source := s.sourceKey(r)
+	if !s.source.Allow("admin:"+source, limit, time.Minute) {
+		s.logger.Warn("admin rate limited", "request_id", requestID(r), "path", r.URL.Path, "source", source)
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "请求过于频繁")
 		return false
 	}
 	header := r.Header.Get("Authorization")
@@ -114,16 +129,8 @@ func (s *Server) authorizeAdmin(w http.ResponseWriter, r *http.Request) bool {
 		token = strings.TrimSpace(header[7:])
 	}
 	if subtle.ConstantTimeCompare([]byte(token), []byte(s.cfg.AdminToken)) != 1 {
-		s.logger.Warn("admin unauthorized", "request_id", requestID(r), "path", r.URL.Path)
+		s.logger.Warn("admin unauthorized", "request_id", requestID(r), "path", r.URL.Path, "source", source)
 		writeError(w, http.StatusUnauthorized, "unauthorized", "需要管理令牌")
-		return false
-	}
-	limit := s.cfg.AdminRate
-	if limit < 1 {
-		limit = 60
-	}
-	if !s.source.Allow("admin:"+sourceKey(r), limit, time.Minute) {
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "请求过于频繁")
 		return false
 	}
 	return true
@@ -149,7 +156,6 @@ func (s *Server) handleAdminStatus(w http.ResponseWriter, r *http.Request) {
 			"now":          s.nowUnix(),
 		},
 		"database": map[string]any{
-			"path":          status.Path,
 			"schemaVersion": status.SchemaVersion,
 			"migratedAt":    status.MigratedAt,
 			"users":         status.Users,
@@ -231,8 +237,12 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, map[string]any{"user": toAdminUser(user)})
 }
 
-func (s *Server) handleAdminEnableUser(w http.ResponseWriter, r *http.Request)  { s.setEnabled(w, r, true) }
-func (s *Server) handleAdminDisableUser(w http.ResponseWriter, r *http.Request) { s.setEnabled(w, r, false) }
+func (s *Server) handleAdminEnableUser(w http.ResponseWriter, r *http.Request) {
+	s.setEnabled(w, r, true)
+}
+func (s *Server) handleAdminDisableUser(w http.ResponseWriter, r *http.Request) {
+	s.setEnabled(w, r, false)
+}
 
 func (s *Server) setEnabled(w http.ResponseWriter, r *http.Request, enabled bool) {
 	if !s.authorizeAdmin(w, r) {

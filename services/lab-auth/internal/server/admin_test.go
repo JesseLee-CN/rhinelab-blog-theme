@@ -94,7 +94,7 @@ func TestAdminDisabledWithoutToken(t *testing.T) {
 
 func TestAdminRequiresTheBearerToken(t *testing.T) {
 	e := adminEnv(t)
-	e.createUser("joyce", "a long enough password")
+	e.createUser("joyce", "A long enough password 1")
 	for _, token := range []string{"", "wrong-token-that-is-long-enough-000", adminToken + "x"} {
 		a := e.asAdmin(token)
 		res := a.call(http.MethodGet, "/api/auth/admin/users", "")
@@ -117,7 +117,7 @@ func TestAdminAccountLifecycleIsAudited(t *testing.T) {
 	a := e.asAdmin(adminToken)
 
 	// create
-	res := a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"Joyce_Moore","password":"a long enough password"}`)
+	res := a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"Joyce_Moore","password":"A long enough password 1"}`)
 	if res.status != http.StatusCreated {
 		t.Fatalf("create: status=%d body=%s", res.status, res.body)
 	}
@@ -127,12 +127,12 @@ func TestAdminAccountLifecycleIsAudited(t *testing.T) {
 	}
 
 	// create with a taken username must not overwrite anything
-	again := a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"joyce_moore","password":"another long password"}`)
+	again := a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"joyce_moore","password":"Another long password 1"}`)
 	if again.status != http.StatusConflict || errorCode(t, again) != "username_taken" {
 		t.Fatalf("duplicate: status=%d code=%s", again.status, errorCode(t, again))
 	}
 	// rule violations are 400 with a specific code, never a generic failure
-	short := a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"ab","password":"a long enough password"}`)
+	short := a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"ab","password":"A long enough password 1"}`)
 	if short.status != http.StatusBadRequest || errorCode(t, short) != "invalid_username" {
 		t.Fatalf("short username: status=%d code=%s", short.status, errorCode(t, short))
 	}
@@ -177,7 +177,7 @@ func TestAdminAccountLifecycleIsAudited(t *testing.T) {
 	}
 
 	// password reset revokes sessions
-	reset := decodeAdmin[adminUserBody](t, a.call(http.MethodPost, "/api/auth/admin/users/joyce_moore/password", `{"password":"a brand new long password"}`))
+	reset := decodeAdmin[adminUserBody](t, a.call(http.MethodPost, "/api/auth/admin/users/joyce_moore/password", `{"password":"A brand new long password 1"}`))
 	if reset.User.CredentialVersion <= enabled.User.CredentialVersion {
 		t.Fatalf("reset must bump the credential version: %+v", reset.User)
 	}
@@ -228,7 +228,7 @@ func TestAdminAccountLifecycleIsAudited(t *testing.T) {
 func TestAdminProtectsTheLastEnabledAccount(t *testing.T) {
 	e := adminEnv(t)
 	a := e.asAdmin(adminToken)
-	a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"only","password":"a long enough password"}`)
+	a.call(http.MethodPost, "/api/auth/admin/users", `{"username":"only","password":"A long enough password 1"}`)
 
 	// A guarded refusal must name the reason; an explicit force is the operator's
 	// confirmation, exactly like `lab-auth user delete -force`.
@@ -243,7 +243,7 @@ func TestAdminProtectsTheLastEnabledAccount(t *testing.T) {
 
 func TestAdminStatusReportsTheDatabase(t *testing.T) {
 	e := adminEnv(t)
-	e.createUser("joyce", "a long enough password")
+	e.createUser("joyce", "A long enough password 1")
 	body := decodeAdmin[struct {
 		Service struct {
 			Version      string `json:"version"`
@@ -270,9 +270,41 @@ func TestAdminStatusReportsTheDatabase(t *testing.T) {
 	}
 }
 
+// TestAdminStatusHidesTheDatabasePath: the filesystem layout is operator-local
+// (the CLI and db status show it), and an HTTP response does not need it.
+func TestAdminStatusHidesTheDatabasePath(t *testing.T) {
+	e := adminEnv(t)
+	res := e.asAdmin(adminToken).call(http.MethodGet, "/api/auth/admin/status", "")
+	if res.status != http.StatusOK {
+		t.Fatalf("status = %d body=%s", res.status, res.body)
+	}
+	if strings.Contains(string(res.body), "auth.db") {
+		t.Fatalf("admin status leaks the database path: %s", res.body)
+	}
+}
+
+// TestAdminFailedAuthIsRateLimited pins the ordering: the limiter is charged
+// before the token is compared, so probing with wrong tokens cannot run forever —
+// and the budget a caller burns is the one they later need for real requests.
+func TestAdminFailedAuthIsRateLimited(t *testing.T) {
+	e := setupWith(t, func(cfg *config.Config) {
+		cfg.AdminToken = adminToken
+		cfg.AdminRate = 2
+	})
+	probing := e.asAdmin("wrong-token-that-is-also-long-enough")
+	for i := 0; i < 2; i++ {
+		if res := probing.call(http.MethodGet, "/api/auth/admin/status", ""); res.status != http.StatusUnauthorized {
+			t.Fatalf("wrong token %d = %d, want 401", i+1, res.status)
+		}
+	}
+	if res := e.asAdmin(adminToken).call(http.MethodGet, "/api/auth/admin/status", ""); res.status != http.StatusTooManyRequests {
+		t.Fatalf("valid token after two failures = %d, want 429", res.status)
+	}
+}
+
 func TestAdminSessionsAndLegacyPrefix(t *testing.T) {
 	e := adminEnv(t)
-	e.createUser("joyce", "a long enough password")
+	e.createUser("joyce", "A long enough password 1")
 	a := e.asAdmin(adminToken)
 
 	// The legacy prefix serves the same contract; older bundles and nginx

@@ -15,10 +15,12 @@ const usernames = [
   ".", "-", "..", "a.b-c_d", "Joyce Lee",
 ];
 const passwords = [
-  "a".repeat(14), "a".repeat(15), "a".repeat(128), "a".repeat(129),
-  `${" ".repeat(3)}${"a".repeat(12)}${" ".repeat(3)}`,
-  "\u{1F600}".repeat(14), "\u{1F600}".repeat(15),
-  "correct horse battery staple", " pass word \u00e9\u00e9 ",
+  // Length boundaries and the required character classes (uppercase, lowercase,
+  // digit). Each "weak" entry isolates one missing class.
+  "a".repeat(5), "a".repeat(6), "AAAAA1", "aaaaa1", "Aaaaaa", "Aa1bbb",
+  "\u{1F600}".repeat(5), "\u{1F600}".repeat(6),
+  "  Aa1  ", "correct horse battery staple",
+  "Ab1" + "a".repeat(125), "Ab1" + "a".repeat(126),
 ];
 
 const fixture = {

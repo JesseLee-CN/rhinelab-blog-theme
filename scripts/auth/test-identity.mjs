@@ -47,12 +47,21 @@ test("guest is a reserved username regardless of case", () => {
 });
 
 test("password length uses code points without trimming or normalisation", () => {
-  assert.equal(id.validatePassword("a".repeat(14)).error, "too-short");
-  assert.equal(id.validatePassword("a".repeat(15)).ok, true);
-  assert.equal(id.validatePassword("a".repeat(128)).ok, true);
-  assert.equal(id.validatePassword("a".repeat(129)).error, "too-long");
-  assert.equal(id.validatePassword("   " + "a".repeat(12) + "   ").ok, true);
-  assert.equal(id.validatePassword("\u{1F600}".repeat(15)).ok, true);
+  assert.equal(id.validatePassword("a".repeat(5)).error, "too-short");
+  assert.equal(id.validatePassword("Aa1" + "b".repeat(3)).ok, true);
+  assert.equal(id.validatePassword("Ab1" + "a".repeat(125)).ok, true);
+  assert.equal(id.validatePassword("Ab1" + "a".repeat(126)).error, "too-long");
+  // Spaces are part of the value, not padding.
+  assert.equal(id.validatePassword("  Aa1  ").ok, true);
+  assert.equal(id.validatePassword("\u{1F600}".repeat(6)).error, "weak");
+});
+
+test("password requires an uppercase letter, a lowercase letter and a digit", () => {
+  assert.equal(id.validatePassword("aaaaaa").error, "weak");
+  assert.equal(id.validatePassword("AAAAA1").error, "weak");
+  assert.equal(id.validatePassword("aaaaa1").error, "weak");
+  assert.equal(id.validatePassword("Aaaaaa").error, "weak");
+  assert.equal(id.validatePassword("Aa1bbb").ok, true);
 });
 
 test("password keeps its exact code points", () => {

@@ -100,53 +100,73 @@
   ],
   "password": [
     {
-      "value": "aaaaaaaaaaaaaa",
+      "value": "aaaaa",
       "ok": false,
       "error": "too-short",
-      "codePoints": 14
+      "codePoints": 5
     },
     {
-      "value": "aaaaaaaaaaaaaaa",
+      "value": "aaaaaa",
+      "ok": false,
+      "error": "weak",
+      "codePoints": 6
+    },
+    {
+      "value": "AAAAA1",
+      "ok": false,
+      "error": "weak",
+      "codePoints": 6
+    },
+    {
+      "value": "aaaaa1",
+      "ok": false,
+      "error": "weak",
+      "codePoints": 6
+    },
+    {
+      "value": "Aaaaaa",
+      "ok": false,
+      "error": "weak",
+      "codePoints": 6
+    },
+    {
+      "value": "Aa1bbb",
       "ok": true,
-      "codePoints": 15
+      "codePoints": 6
     },
     {
-      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "value": "😀😀😀😀😀",
+      "ok": false,
+      "error": "too-short",
+      "codePoints": 5
+    },
+    {
+      "value": "😀😀😀😀😀😀",
+      "ok": false,
+      "error": "weak",
+      "codePoints": 6
+    },
+    {
+      "value": "  Aa1  ",
+      "ok": true,
+      "codePoints": 7
+    },
+    {
+      "value": "correct horse battery staple",
+      "ok": false,
+      "error": "weak",
+      "codePoints": 28
+    },
+    {
+      "value": "Ab1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "ok": true,
       "codePoints": 128
     },
     {
-      "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "value": "Ab1aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "ok": false,
       "error": "too-long",
       "codePoints": 129
-    },
-    {
-      "value": "   aaaaaaaaaaaa   ",
-      "ok": true,
-      "codePoints": 18
-    },
-    {
-      "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
-      "ok": false,
-      "error": "too-short",
-      "codePoints": 14
-    },
-    {
-      "value": "😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀",
-      "ok": true,
-      "codePoints": 15
-    },
-    {
-      "value": "correct horse battery staple",
-      "ok": true,
-      "codePoints": 28
-    },
-    {
-      "value": " pass word éé ",
-      "ok": false,
-      "error": "too-short",
-      "codePoints": 14
     }
   ]
 }
