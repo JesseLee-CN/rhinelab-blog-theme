@@ -970,7 +970,9 @@ button {
   box-shadow: 0 26px 95px #63513a20;
   border: 1px solid #f7f5ee;
   position: relative;
-  padding: 35px 53px;
+  /* Top inset lives on the sticky .modal-top: padding here would peek out
+     above the bar while the panel scrolls. */
+  padding: 0 53px 35px;
 }
 .modal-top {
   display: flex;
@@ -980,6 +982,17 @@ button {
   letter-spacing: 1px;
   border-bottom: 1px solid #c2bdb1;
   padding-bottom: 20px;
+}
+/* Keep the dialog bar visible while tall panels (system settings on phones)
+   scroll: the close button must stay within reach. The reader toolbar shares
+   .modal-top but sits in a non-scrolling sheet, so it is excluded here. */
+.terminal-modal > .modal-top:not(.reader-toolbar) {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  /* Opaque on purpose: scrolling content must not show through under the bar. */
+  background: #edeae4;
+  padding-top: 35px;
 }
 .modal-top button {
   font-size: 10px;
