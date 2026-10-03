@@ -990,8 +990,9 @@ button {
   position: sticky;
   top: 0;
   z-index: 3;
-  /* Opaque on purpose: scrolling content must not show through under the bar. */
-  background: #edeae4;
+  /* Opaque on purpose: scrolling content must not show through under the bar.
+     Follows the surface palette so the bar does not stay light in dark mode. */
+  background: var(--theme-panel, #edeae4);
   padding-top: 35px;
 }
 .modal-top button {

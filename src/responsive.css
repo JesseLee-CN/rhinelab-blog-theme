@@ -199,6 +199,8 @@
      sticky bar; the reader sheet keeps its own insets from above. */
   [data-layout="portrait"] .terminal-modal:not(.reader-sheet) { padding: 0 12px 12px; }
   [data-layout="portrait"] .reader-sheet { padding: 12px; }
+  /* Match the container's 12px insets so the bar's top gap does not read wider. */
+  [data-layout="portrait"] .modal-top:not(.reader-toolbar) { padding-top: 12px; }
   [data-layout="portrait"] :is(.result-header, .result-row) { grid-template-columns: minmax(0, 1fr) 68px; }
   [data-layout="portrait"] .viewer-actions button { min-width: 90px; padding-inline: 8px; }
 }
