@@ -119,10 +119,17 @@
    system dialogs (`data-layout` is mirrored onto the reader dialog by
    `article-reader.ts`, since the dialog lives in the top layer, outside #stage). */
 :is([data-layout="compact"], [data-layout="portrait"]) :is(.modal-backdrop, .reader-backdrop) { top: var(--modal-top, 0px); height: var(--modal-height, 100%); bottom: auto; padding: var(--top-edge) var(--edge) var(--bottom-edge); }
-:is([data-layout="compact"], [data-layout="portrait"]) :is(.terminal-modal, .reader-sheet) { width: min(760px, 100%); height: 100%; max-height: 850px; padding: 16px 20px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+:is([data-layout="compact"], [data-layout="portrait"]) :is(.terminal-modal, .reader-sheet) { width: min(760px, 100%); height: 100%; max-height: 850px; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* The reader window also carries .terminal-modal, so the paddings must not
+   overlap: the sheet keeps its own insets (its toolbar never scrolls) while
+   the sticky bar takes over the top inset of system dialogs. */
+:is([data-layout="compact"], [data-layout="portrait"]) .reader-sheet { padding: 16px 20px; }
+:is([data-layout="compact"], [data-layout="portrait"]) .terminal-modal:not(.reader-sheet) { padding: 0 20px 16px; }
 /* The reader scrolls inside its own region, so the window itself must not scroll. */
 :is([data-layout="compact"], [data-layout="portrait"]) .reader-sheet { overflow: hidden; }
 :is([data-layout="compact"], [data-layout="portrait"]) .modal-top { padding-bottom: 8px; font-size: 9px; gap: 12px; }
+/* Same for the reader toolbar: its top inset comes from reader.css. */
+:is([data-layout="compact"], [data-layout="portrait"]) .modal-top:not(.reader-toolbar) { padding-top: 16px; }
 :is([data-layout="compact"], [data-layout="portrait"]) :is(.modal-top button, .reader-toolbar button) { min-height: 44px; min-width: 44px; gap: 8px; }
 :is([data-layout="compact"], [data-layout="portrait"]) .terminal-modal h2 { font-size: 25px; margin: 18px 0; flex-wrap: wrap; gap: 8px; }
 :is([data-layout="compact"], [data-layout="portrait"]) .terminal-modal h2 small { font-size: 12px; }
@@ -188,7 +195,12 @@
   [data-layout="portrait"] .system-nav { gap: 0; }
   [data-layout="portrait"] .column-navigation { gap: 2px; }
   [data-layout="portrait"] .file-ticks button { width: 24px; }
-  [data-layout="portrait"] .terminal-modal { padding: 12px; }
+  /* Keep the narrow-screen 12px insets, minus the top one now owned by the
+     sticky bar; the reader sheet keeps its own insets from above. */
+  [data-layout="portrait"] .terminal-modal:not(.reader-sheet) { padding: 0 12px 12px; }
+  [data-layout="portrait"] .reader-sheet { padding: 12px; }
+  /* Match the container's 12px insets so the bar's top gap does not read wider. */
+  [data-layout="portrait"] .modal-top:not(.reader-toolbar) { padding-top: 12px; }
   [data-layout="portrait"] :is(.result-header, .result-row) { grid-template-columns: minmax(0, 1fr) 68px; }
   [data-layout="portrait"] .viewer-actions button { min-width: 90px; padding-inline: 8px; }
 }
