@@ -153,6 +153,24 @@ node ops/smoke-test.mjs <url>  # 线上/候选 smoke 检查
 - 长任务先落盘一部分有效成果，再继续补齐；及时报告具体进展。
 - 文档与代码注释描述最终行为，避免把推测写成事实；未执行的命令、占位符与模板要明确标注。
 
+### 9.1 分支模型与协作约定（2026-10-06 起）
+
+基线：`main@007313b`，标注 tag `baseline-2026-10-06`。自此开放仓库按下面的模型开发：
+
+| 分支 | 角色 | 直接推送权限 |
+| --- | --- | --- |
+| `main` | **稳定发布**：只承接来自 `develop` 的发布合并，基线之上不接受直接提交 | 仅授权者（默认仅仓库所有者） |
+| `develop` | **集成开发与测试**：日常开发、集成与验证都落在这里 | 仅授权者（默认仅仓库所有者） |
+| `feature/<主题>` | **特性开发与 PR 提交**：短生命周期，按特性或修复各开一条 | 各协作者自由推送自己的分支 |
+
+- 新工作一律从 `develop` 拉出 `feature/<主题>`；完成后**只向 `develop` 提 PR**，不向 `main` 提。
+- **不得直接向 `main` 提交**；`main` 只接受经明确授权的合并（发布时由 `develop` 合入 `main`）。
+- 其他协作者不要直接推 `develop`：先推自己的 `feature/*`，再向 `develop` 提 PR。
+- 三个远端保持同一提交：`origin`（GitHub，主）、`gitlab`（NJU 校内）、`atomgit`（AtomGit）。
+  日常推送用 `git pushall`；新分支与标签要显式 `git push <remote> <branch|tag>`。
+- 构建、release、上传与 smoke 针对私有仓库，见 [BLOG-MAINTAIN-PERFECT.md](BLOG-MAINTAIN-PERFECT.md)；
+  开放仓库只负责模板源码本身。
+
 ## 10. 许可边界
 
 源码 MIT **不自动覆盖**游戏品牌、原作素材、模型、字体或短音。按 [LICENSE](LICENSE) 与
